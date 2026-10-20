@@ -2,6 +2,8 @@
 
 Stand: 20. Oktober 2026. Untersuchte App: Git-Stand `d961cfbe4b276540d161886b3fb2d8e3563ce8bc`.
 
+Fortsetzung nach der GitHub-Migration: Ein isolierter technischer Importviewer wird auf `feature/noct-3d` vorbereitet. Aktueller Umfang, Testanleitung und weiterhin fehlende Modellkachel: [Prototyp-Dokumentation](../prototypes/README.md). Die folgenden Befunde dokumentieren die ursprüngliche Datensatzprüfung, keinen abgeschlossenen texturierten Modellvergleich.
+
 ## Ergebnis und Status
 
 Ein fachlich passender Datensatz existiert: das offizielle **3D-Meshmodell Berlin, Befliegung 2025**, mit OBJ-Geometrie und Bildtexturen. Die kommerzielle Nutzung und das eigene Hosting dieser konkreten Dateien sind hier jedoch **noch nicht verifiziert**. Der aktuelle Katalog verweist auf separate Bedingungen; „kostenfrei herunterladbar“ reicht als Lizenznachweis nicht aus.
