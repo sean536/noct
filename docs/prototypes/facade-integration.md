@@ -1,50 +1,49 @@
 # NOCT – Fassaden in der vollständigen Webapp
 
-Stand 20.10.2026, Branch `feature/noct-3d`. Der vorhandene prozedurale Generator ist jetzt mit der Hauptkarte unter `/` verbunden. Keine Veröffentlichung und kein Merge nach `main`. Die isolierten Prototyp-Routen bleiben für Vergleiche erhalten.
+Branch `feature/noct-3d`, 20.10.2026. Die vollständige App ist separat unter https://noct-facades-test.tuned-cove-5285.chatgpt.site erreichbar (privat, Anmeldung mit dem Eigentümer-Konto). Die öffentliche NOCT-Website wird damit nicht aktualisiert. Kein Merge nach GitHub-`main`.
 
-## Umfang
+## Diagnose der zunächst kaum sichtbaren Fassaden
 
-Nur die Gebäudedarstellung wurde angeschlossen. `app/page.tsx`, `app/globals.css`, Chat, Events, Navigation, Merkliste und die Dateien `camera-plan.ts`, `scene-flight.ts` und `tour.ts` sind gegenüber dem Ausgangsstand unverändert. Auch die JSX-Oberfläche von `CityMap.tsx` wurde nicht verändert. Die Änderung dort besteht aus dem Gebäude-Paint-Ausdruck, dem optionalen Renderer-Anschluss und dessen Lebenszyklus.
+Die Integration in `9b71e19` wurde mit synthetischen Einzelpolygonen geprüft. Dabei fehlte eine Eigenschaft der tatsächlichen Datenarchitektur: Der OpenFreeMap-Datengenerator fasst Gebäude mit gleichen Attributen als **MultiPolygon** zusammen. Der bisherige Normalisierer akzeptierte nur einzelne Polygon-Features. Außerdem wurden mehrfach verwendete beziehungsweise fehlende Feature-IDs vollständig ausgeschlossen. Damit erreichten viele Grundrisse den Fassaden-Shader überhaupt nicht.
 
-- `lib/facade-state.ts`: Der bestehende Gebäudelayer liest den Zustand `noct_facade_ready`. Nur ein vorbereitetes Gebäude wird auf Extrusionshöhe null gesetzt; alle anderen behalten ihre ursprüngliche Datenhöhe. Keine Änderung an Source-Filtern, Datentiles, Licht, Luftbildern oder Kameraparametern. Andere Feature-State-Schlüssel werden nicht angerührt.
-- `lib/facade-map.ts`: Liest die bereits geladenen Features aus `buildings` / `building`, prüft Identitäten und verwendet den vorhandenen Generator. Keine neuen Gebäudedienste, keine neuen Netzwerk-Endpunkte, keine künstlichen Grundrisse in der Hauptkarte. Identitätskonflikte und fehlende beziehungsweise ungeeignete Daten bleiben beim ursprünglichen Fallback.
-- `prototypes/facades/layer.ts`: Der vorhandene Three.js-Layer behält einen Renderer und den gemeinsamen WebGL-Kontext. Nur der kleine Geometriebatch wird ausgetauscht. Shader werden vor der Umschaltung vorbereitet; bei Fehlern werden die ursprünglichen Gebäude wiederhergestellt.
-- `prototypes/facades/data.ts`: Die bisherige LOD-Funktion erhält einen optionalen Balkon-Grenzwert. Die Hauptkarte verwendet 16,5 statt des Laborwerts 17, damit Details zur **unveränderten** Tour-Zoomstufe 16,6 passen. Die Labor-Standardeinstellung bleibt bestehen.
+Nachweisbare Provider-Implementierung: [Building.java](https://github.com/openmaptiles/planetiler-openmaptiles/blob/main/src/main/java/org/openmaptiles/layers/Building.java) ruft in `postProcess` `FeatureMerge.mergeMultiPolygon` auf. [FeatureMerge.java](https://github.com/onthegomap/planetiler/blob/main/planetiler-core/src/main/java/com/onthegomap/planetiler/FeatureMerge.java) beschreibt die Zusammenfassung von gleich attribuierten Polygonen. Die [OpenMapTiles-Gebäudefelder](https://openmaptiles.org/docs/schema/#building) enthalten Höhen, Farbe und `hide_3d`; Nutzungs- und Dachinformationen sind dort nicht zugesichert.
 
-## Darstellung und Leistung
+Das war eine Lücke der früheren Tests. Erfolgreiche Shader-Zeichenaufrufe an synthetischen Häusern belegten nicht die ausreichende Aktivierung an diesem Providerformat.
 
-Fenster, Rahmen, Materialien, Fensterbänke, Eingänge und warme Lichtmuster stammen aus dem vorhandenen Shader. Balkone werden nur mit geeigneten Wohnnutzungsinformationen erzeugt. Satteldächer benötigen unterstützte Dachinformationen und passende rechteckige Grundrisse. Falls die Vektorkachel diese Tags nicht enthält, werden sie nicht erfunden. Fassaden bleiben prozedurale Interpretationen; keine fotografisch erfassten Berliner Fassaden.
+## Gezielte Korrektur
 
-Im direkten Umfeld werden auf reduziertem Gerätebudget höchstens **12**, sonst **20** geeignete Gebäude detailliert. Weiter entfernte und nicht unterstützte Gebäude bleiben die bisherigen Extrusionen. Maximal drei zusätzliche Draw Calls pro Batch, instanzierte Balkone und keine Fassaden-Bildtexturen. Der vorhandene Generator reduziert Balkone unter anhaltender Last. Die Kartenauflösung und die Kameraeinstellungen der App bleiben unverändert.
+- `prototypes/facades/data.ts`: Optionaler Oberflächenmodus zerlegt MultiPolygone in begrenzte Einzelgrundrisse. Fenster-/Materialvarianten sind an kanonische Grundrisse gebunden, unabhängig von Reihenfolge oder zusammengefasster Kachel-ID. Gleiche Geometrien werden dedupliziert. Der bisherige isolierte Prototyp behält seine Standardeinstellungen.
+- `lib/facade-map.ts`: Verwendet diese Oberflächen für die bereits geladenen Daten von `buildings` / `building`. Keine neue Datenquelle und keine zusätzlichen Gebäude-Downloads. Unveränderte Geometrie bleibt auch bei geänderter Provider-Gruppen-ID im vorhandenen Renderer.
+- `prototypes/facades/mesh.ts`: Fassaden überdecken nur die entsprechenden Außenwandflächen. Ein kleiner GPU-Tiefenoffset verhindert, dass die ursprünglichen, deckungsgleichen Extrusionswände die Fenster verdecken. Die Tiefenprüfung bleibt aktiv; davorliegende Gebäude verdecken rückwärtige Fassaden weiterhin korrekt. Der Oberflächenmodus rendert kein zweites Dach.
+- `prototypes/facades/layer.ts`: Reicht diese bestehende Renderoption weiter; ein Three.js-Renderer und ein gemeinsamer MapLibre-WebGL-Kontext bleiben erhalten.
 
-Aktualisierung nur bei geänderten Gebäude-IDs, Grundrissen, Höhen oder relevanten Tags, höchstens nach einem zusammengefassten 750-ms-Intervall. Reine Kameraframes mit unverändertem Batch bauen keine neue Geometrie auf. Kein eigener Dauer-RAF-Loop, kein zweiter Karten-Canvas und kein Renderer pro Haus. Bei niedrigerem Zoom, großer Entfernung, Hintergrundwechsel oder Fehlern werden die Ersatz-Zustände aufgehoben. Entfernen der Karte löscht Timer, Listener und Render-Ressourcen.
+**Keine ganzen Kachel-Features werden mehr ausgeblendet.** Eine Feature-ID kann viele Gebäude enthalten, von denen nur einige in das Detailbudget passen. Die bestehenden Extrusionen bleiben deshalb als vollständige Geometrie, Dächer, Verdeckung und Fehler-Fallback erhalten. Es entstehen keine zweiten Gebäudekörper.
 
-MapLibre liefert bei `querySourceFeatures` bereits geladene, möglicherweise geteilte Vektorkachel-Geometrie. Erkennbare widersprüchliche Fragmente/IDs werden verworfen; die öffentliche API garantiert keine vollständigen, ungeclippten Gebäude. Eine einzelne unerkannte Teilgeometrie bleibt eine Datenquellen-Grenze. Keine Behauptung einer flächendeckenden oder amtlich erfassten 3D-Rekonstruktion.
+Fenster und warme Beleuchtung bleiben prozedural. Balkone werden weiterhin nur bei passenden Nutzungsinformationen erzeugt; fehlende Wohnnutzungsdaten werden nicht als tatsächlich vorhandene Balkone ausgegeben. Die zugrunde liegenden Dächer und Gebäudesilhouetten bleiben erhalten. Keine Behauptung fotografisch erfasster Fassaden.
+
+## Grenzen und Kosten
+
+Unverändert maximal **12** detaillierte Gebäude auf reduziertem/mobilem Gerätebudget beziehungsweise **20** sonst. Fenster bei Zoom ≥15,4, Hauptkarten-Balkongrenze 16,5, normale Tour-Zielzoomstufe 16,6. Keine Änderung an Kamera, Tourdauer, Perspektiven, Karten-DPR oder App-UI. Aktualisierungen bleiben auf das bestehende 750-ms-Intervall zusammengefasst. Keine eigenen Dauer-Animationen oder neuen Abhängigkeiten. Nicht unterstützte/fehlende Grundrisse und Höhen, Hintergrundtab, entfernter Zoom und Rendererfehler behalten den ursprünglichen Karten-Fallback.
+
+QuerySourceFeatures liefert weiterhin kachelweise, unter Umständen geclippte Geometrie. Das ist keine vollständige Stadtmodell-Datenbank. Das Oberflächenverfahren kann Teilgrundrisse nutzen, ohne andere Teile einer Sammel-ID zu löschen; es rekonstruiert daraus keine unbekannten Fassaden, Dachformen oder fehlenden Daten.
 
 ## Tatsächlich geprüft
 
-- Gesamter vorhandener Testbestand einschließlich Modellimport, Startscreen, Chat, Events, Verkehr, Kamera-/Toursteuerung bestanden: **19 Testdateien** im Suite-Lauf.
-- Zusätzlich direkt ausgeführt: **acht Integrationsprüfungen** für gültige Style-Spezifikation, selektiven Feature-State, Rollback, Wiederverwendung, niedrigen Zoom, fehlende Daten, widersprüchliche IDs und Rendererfehler.
-- TypeScript (`npm run typecheck`) und Produktionsbuild (`npm run build`) bestanden. Die vollständige App und beide Prototyp-Routen sind im statischen Export enthalten.
-- Vollständige Root-App in Chromium/SwiftShader geprüft, mit kontrollierten **synthetischen MVT-Testkacheln** an den vorhandenen Eventkoordinaten und einem ausdrücklich nur im Test abgefangenen Rasterbild. Diese Testdaten befinden sich nicht im Produktions-Datenpfad.
-- Echte WebGL-Zeichenaufrufe des Fassaden-Shaders während der bestehenden automatischen Tour bestätigt: sowohl Desktop als auch Touch-Viewport 390 × 844. Auch Balkon-Instancing wurde ausgeführt. Dies belegt Rendering im vollständigen App-Code, keine iPhone-FPS.
-- Quick-Reply → Chatantwort/Empfehlungen, alle sieben Eventkarten, Eventdetails, Speichern, Merkliste und Persistenz nach Neuladen erfolgreich. Ein absichtlich nicht ladbares optionales Fassadenmodul lässt die bestehende Karte und den Chat weiterhin nutzbar. Keine JavaScript-/Shaderfehler im erfolgreichen Lauf.
+`tests/fixtures/berlin-weekend.json` enthält 20 unverändert geografisch positionierte Berliner LoD2-Grundrisse mit Höhen nahe dem bestehenden Weekend-Club-Eventgebiet. Quelle und unveränderlicher Git-Blob sind im Fixture dokumentiert. Datenlizenz: **Datenlizenz Deutschland – Zero – 2.0**. Die absoluten NH-Höhen `base_m` werden nicht als Höhe über Grund verwendet. Das Fixture gehört ausschließlich zu den Tests und wird nicht als Ersatzdatenquelle in die App eingebaut.
 
-Der Live-Tiledienst `https://tiles.openfreemap.org/planet` wird in dieser Cloudumgebung weiterhin mit **CONNECT 403** abgewiesen. Daher sind echte geladene Berliner Tiles, das tatsächliche Angebot an Nutzungs-/Dachtags und die Leistung auf einem physischen iPhone **noch nicht bestätigt**. Der Browser-Test verwendet dasselbe MVT-/MapLibre-Verfahren mit kontrollierten Antworten; er ist kein Ersatz für diesen Live-Nachweis. Die öffentliche Website wurde nicht als Testziel verändert.
+Für die MapLibre-Prüfung wurden diese realen Geometrien mit ihren Höhen in das dokumentierte MultiPolygon-/MVT-Format übersetzt. Es handelt sich um einen **Replay mit realen Berliner Geometrien**, nicht um einen frisch abgerufenen OpenFreeMap-Kachelbestand. Der Testhintergrund ist neutral, kein behauptetes echtes Luftbild.
 
-## Interaktive Vorschau – konkreter technischer Stand
+| Messung desselben Ausschnitts | Bisher | Korrigiert |
+| --- | ---: | ---: |
+| Detaillierte Grundrisse Desktop | 3 | 20 |
+| Detaillierte Grundrisse Mobilansicht | 3 | 12 |
+| Zusätzliche Draw Calls in diesem Ausschnitt | 2 | 1 |
+| Fassaden-Bildtexturen | 0 | 0 |
 
-Die integrierte vollständige App wurde für QA auf einem internen HTTP-Port gestartet. In dieser Sitzung ist kein Werkzeug zur externen Portfreigabe beziehungsweise zum Öffnen eines freigegebenen Codex-Vorschau-Tabs verfügbar. Eine Cloud-Loopback-Adresse ist kein für Sean erreichbarer Link.
+Die korrigierte Geometrie benötigt in diesem Ausschnitt ungefähr 63 KiB am Desktop beziehungsweise 41 KiB mobil. Das ist eine Szenenmessung, kein allgemeiner Speicherverbrauch der App. GPU-Renderzeit und physische iPhone-FPS wurden nicht gemessen.
 
-Die vorhandenen Sites-Werkzeuge können die aktuelle öffentliche NOCT-Instanz veröffentlichen; diese Instanz darf hierfür ausdrücklich nicht verwendet werden. Für ein **getrenntes privates Vorschauprojekt** fehlt in der Arbeitsumgebung der zum unterstützten Source-/Publishing-Ablauf gehörende `site-workflow.mjs`-Helper. Es wurde kein neuer Site-Datensatz angelegt und keine erfolgreiche Veröffentlichung behauptet. Keine PDFs oder Screenshots werden als Ersatz für eine interaktive Vorschau angeboten.
+Geprüft: sichtbare Fenster und warme Fensterlichter im identisch positionierten Vorher-/Nachher-Bildpaar, bestehende Zielzoomstufe 16,6 und schräge Desktop-/Mobilperspektiven, Zoom/Drehen und schnell aufeinanderfolgende Bewegungen, Original-Extrusionen als Fallback, Renderer-Wiederverwendung und Fehlerfälle. Zusätzlich vollständige Root-App: manuelle Eventauswahl, Eventdetails, Merkliste sowie Quick-Reply → Chatantwort/Empfehlungen. Keine beobachteten JavaScript-/Shaderfehler im erfolgreichen Browserlauf. Die UI-, Chat-, Event-, Marker- und Kameradateien wurden per Hash als unverändert geprüft.
 
-Sobald die Vorschau-/Publishing-Funktion in einer geeigneten Codex-Umgebung verfügbar ist, ist der Ablauf:
+Die Suite umfasst jetzt **20 Testdateien**, zusätzlich direkt ausgeführte symptombezogene Fassadentests. Produktionsbuild und TypeScript wurden für die Veröffentlichung geprüft. Die Browserläufe verwenden Chromium/SwiftShader und einen Touch-Viewport 390 × 844, kein physisches iPhone.
 
-1. Den geprüften Stand von `feature/noct-3d` übernehmen; keine Änderungen oder automatischen Merges auf `main` oder `design/noct-apple`.
-2. Ein **eigenes, privates** Vorschauprojekt für die vollständige App auswählen/anlegen. Dessen Projekt-ID ausschließlich in einer getrennten Vorschau-Arbeitskopie hinterlegen. Die bestehende `.openai/hosting.json` und öffentliche NOCT-Zuordnung erhalten.
-3. Aus genau diesem Quellstand `npm ci`, Tests, TypeScript und `npm run build` ausführen. Als statisches Verzeichnis den bereits bestehenden Next.js-Export **`out`** verwenden. Keine Architekturänderung, kein API-Key für die Standardkarte.
-4. Nur dieses private Vorschauprojekt veröffentlichen, erfolgreiches Deployment bestätigen und Sean den vollständigen **Root-Link `/`** geben. Dort stehen App, Chat, Eventmarker und Tour gemeinsam bereit; nicht nur die Laborroute.
-5. Im normalen Browser mit erreichbaren Geoportal-/OpenFreeMap-Diensten die echten Berliner Footprints und iPhone/Safari-Leistung prüfen. Die Entwicklungsumgebungs-Sperre erfordert gegebenenfalls eine Umgebungs-Netzfreigabe für diese Dienste, keine Umdeutung von Testkacheln als Echtdaten.
-6. Erst nach gesonderter Freigabe durch Sean den geprüften Stand auf der öffentlichen NOCT-Instanz ausrollen. Kein automatischer Merge oder öffentlicher Rollout gehört zu diesem Auftrag.
-
-Sean muss dafür lokal nichts installieren oder Befehle ausführen. Die private Vorschau ist mit dem aktuellen Auftrag angefordert; es fehlt die technische Bereitstellungsmöglichkeit. Eine spätere Freigabe zur öffentlichen Veröffentlichung ersetzt keine noch ausstehende Live-/Geräteprüfung.
+**Verbleibende Verifikationsgrenze:** Der direkte Abruf von `tiles.openfreemap.org` und Geoportal-Kacheln ist in dieser Entwicklungsumgebung durch die Netzwerk-Allowlist blockiert (CONNECT 403). Deshalb ist die Darstellung mit den aktuell live ausgelieferten Tiles hier nicht separat bestätigt. Das ist unabhängig davon, dass die verwendeten QA-Grundrisse echte Berliner Daten sind. Der Testwebsite-Browser lädt unverändert die normalen Live-Dienste.

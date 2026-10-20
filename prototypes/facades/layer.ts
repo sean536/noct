@@ -9,9 +9,9 @@ export class FacadeLayer implements CustomLayerInterface {
  private frame:Matrix4;private model:FacadeScene;private map?:GLMap;private disposed=false;private failed=false;private shown=true;private night=true;
  private frames=0;private cpuTotal=0;private first=true;private pressure=0;private previous=0;private reduced=false;
  onFailure?:(error:Error)=>void;onFirstFrame?:()=>void;
- constructor(public buildings:FacadeBuilding[],public origin:Point,readonly mobile:boolean,private readonly options:{id?:string;balconyZoom?:number}={}){
+ constructor(public buildings:FacadeBuilding[],public origin:Point,readonly mobile:boolean,private readonly options:{id?:string;balconyZoom?:number;surfaceOverlay?:boolean}={}){
   this.id=options.id??'lab-procedural-facades';
-  this.frame=geographicFrame(origin);this.model=createFacadeScene(buildings,origin,mobile);this.scene.add(this.model.group);
+  this.frame=geographicFrame(origin);this.model=createFacadeScene(buildings,origin,mobile,options);this.scene.add(this.model.group);
  }
  onAdd(map:GLMap,context:WebGLRenderingContext|WebGL2RenderingContext){
   this.map=map;this.renderer=new WebGLRenderer({canvas:map.getCanvas(),context:context as WebGL2RenderingContext});
@@ -29,7 +29,7 @@ export class FacadeLayer implements CustomLayerInterface {
  }
  updateBuildings(buildings:FacadeBuilding[],origin:Point){
   if(!this.renderer||this.disposed||this.failed)throw Error('Fassaden-Renderer nicht verfügbar.');
-  const next=createFacadeScene(buildings,origin,this.mobile),candidate=new Scene();next.setNight(this.night);candidate.add(next.group);
+  const next=createFacadeScene(buildings,origin,this.mobile,this.options),candidate=new Scene();next.setNight(this.night);candidate.add(next.group);
   try{
    this.renderer.resetState();this.renderer.compile(candidate,this.camera);if(this.failed)throw Error('Fassaden-Shader nicht verfügbar.');
    const previous=this.model;this.scene.remove(previous.group);this.model=next;this.scene.add(next.group);

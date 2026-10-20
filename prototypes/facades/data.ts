@@ -35,7 +35,7 @@ function canonicalRing(input:number[][]):Point[]{
  const a=rotate(ring),b=rotate([...ring].reverse());return JSON.stringify(a)<JSON.stringify(b)?a:b;
 }
 function numeric(value:unknown){if(typeof value!=='number'&&typeof value!=='string')return NaN;return Number(value);}
-function normalize(feature:BuildingFeature,origin:Point):FacadeBuilding{
+function normalize(feature:BuildingFeature,origin:Point,surfaceOverlay=false):FacadeBuilding{
  if(feature.geometry.type!=='Polygon'||feature.geometry.coordinates.length>8)throw Error('Multipart needs complete source geometry');
  const p=feature.properties??{},height=numeric(p.render_height??p.height),base=numeric(p.render_min_height??p.min_height??0);
  if(!(height>=4&&height<=150)||base!==0||p.hide_3d===true||p.hide_3d==='true'||p.hide_3d===1)throw Error('Unsupported height/part');
@@ -48,7 +48,9 @@ function normalize(feature:BuildingFeature,origin:Point):FacadeBuilding{
  if(area<35||area>18000||Math.hypot(...center)>480||outer.some(p=>Math.hypot(p[0]-center[0],p[1]-center[1])>180))throw Error('Prototype area budget');
  const sourceId=typeof feature.id==='number'||typeof feature.id==='string'?feature.id:null;
  const stable=p.osm_id??sourceId;
- const id=stable!==null&&stable!==undefined?`osm:${String(stable).slice(0,120)}`:`footprint:${hash(JSON.stringify(geometry))}`;
+ // A merged vector-tile ID belongs to many footprints. Surface identity must follow
+ // the canonical footprint, not the provider's group or component order.
+ const id=surfaceOverlay?`surface:${hash(JSON.stringify(geometry))}`:stable!==null&&stable!==undefined?`osm:${String(stable).slice(0,120)}`:`footprint:${hash(JSON.stringify(geometry))}`;
  const seed=hash(id),usage=String(p.building??p.class??'').toLowerCase();
  const residential=['apartments','residential','house','terrace','detached'].includes(usage);
  const commercial=['retail','commercial','shop'].includes(usage);
@@ -58,16 +60,27 @@ function normalize(feature:BuildingFeature,origin:Point):FacadeBuilding{
  const u=outer[1].map((n,i)=>n-outer[0][i]),v=outer[3]?.map((n,i)=>n-outer[0][i]);
  const rectangle=outer.length===4&&rings.length===1&&v&&Math.abs(u[0]*v[0]+u[1]*v[1])<.02*Math.hypot(...u)*Math.hypot(...v)
   &&Math.hypot(outer[2][0]-outer[1][0]-outer[3][0]+outer[0][0],outer[2][1]-outer[1][1]-outer[3][1]+outer[0][1])<.1;
- const roof=rectangle&&roofShape==='gabled'?'gabled':'flat';
+ const roof=!surfaceOverlay&&rectangle&&roofShape==='gabled'?'gabled':'flat';
  const taggedRoof=numeric(p['roof:height']??p.roof_height);
  const roofHeight=roof==='gabled'?Math.min(height*.22,Number.isFinite(taggedRoof)&&taggedRoof>0?taggedRoof:2.6):0;
  return {id,sourceId,geometry,rings,height,base,area,center,seed,residential,commercial,industrial,material:String(p['building:material']??p.material)==='brick'||random(seed,1)>.74?'brick':'plaster',roof,roofHeight};
 }
-export function selectBuildings(features:BuildingFeature[],origin:Point,limit=16){
+export function selectBuildings(features:BuildingFeature[],origin:Point,limit=16,options:{surfaceOverlay?:boolean}={}){
  const byId=new Map<string,FacadeBuilding>(),conflicts=new Set<string>();let rejected=0;
+ // OpenFreeMap merges equal-attribute buildings into MultiPolygons. A surface
+ // overlay can detail individual parts without hiding an entire merged feature.
+ const input:BuildingFeature[]=[];
  for(const f of features.slice(0,4096)){
-  try{const b=normalize(f,origin),previous=byId.get(b.id);
-   if(previous&&JSON.stringify(previous.geometry)!==JSON.stringify(b.geometry)){conflicts.add(b.id);rejected++;}
+  const parts=options.surfaceOverlay&&f.geometry.type==='MultiPolygon'?f.geometry.coordinates:[f.geometry.coordinates];
+  for(const coordinates of parts){
+   if(input.length>=4096)break;
+   input.push(options.surfaceOverlay?{...f,geometry:{type:'Polygon',coordinates:coordinates as Polygon['coordinates']}}:f);
+  }
+  if(input.length>=4096)break;
+ }
+ for(const f of input){
+  try{const b=normalize(f,origin,options.surfaceOverlay),previous=byId.get(b.id);
+   if(previous&&(JSON.stringify(previous.geometry)!==JSON.stringify(b.geometry)||options.surfaceOverlay&&previous.height!==b.height)){conflicts.add(b.id);rejected++;}
    else if(!previous)byId.set(b.id,b);
   }catch{rejected++;}
  }

@@ -95,7 +95,7 @@ export interface FacadeScene {
  metrics:{triangles:number;geometryBytes:number;instanceBytes:number;buildings:number};
  setNight(night:boolean):void;setDetail(windows:boolean,balconies:boolean):void;dispose():void;
 }
-export function createFacadeScene(buildings:FacadeBuilding[],_origin:Point,mobile:boolean):FacadeScene{
+export function createFacadeScene(buildings:FacadeBuilding[],_origin:Point,mobile:boolean,options:{surfaceOverlay?:boolean}={}):FacadeScene{
  const group=new Group(),wallBuffer=empty(),roofBuffer=empty(),balconyTransforms:Matrix4[]=[];
  const balconyLimit=mobile?72:180;
  const box=(center:Vector3,scale:Vector3,rotation:number)=>{if(balconyTransforms.length<balconyLimit*5)balconyTransforms.push(new Matrix4().compose(center,new Quaternion().setFromAxisAngle(new Vector3(0,1,0),rotation),scale));};
@@ -139,9 +139,13 @@ export function createFacadeScene(buildings:FacadeBuilding[],_origin:Point,mobil
    }
   }else for(const face of faces)triangle(roofBuffer,face.map(i=>new Vector3(flat[i][0],b.height,flat[i][1])),new Vector3(0,1,0),[[0,0],[0,0],[0,0]],b,0);
  }
- const wallMaterial=new ShaderMaterial({vertexShader:vertex,fragmentShader:fragment,side:DoubleSide,uniforms:{uNight:{value:1},uDetail:{value:1}}});
+ const wallMaterial=new ShaderMaterial({vertexShader:vertex,fragmentShader:fragment,side:DoubleSide,uniforms:{uNight:{value:1},uDetail:{value:1}},
+  // Keep original extrusions as occluders/fallback. Only their coplanar wall
+  // surfaces are covered; neighbouring buildings still occlude these details.
+  polygonOffset:!!options.surfaceOverlay,polygonOffsetFactor:options.surfaceOverlay?-1:0,polygonOffsetUnits:options.surfaceOverlay?-1:0});
  const solid=(color:string)=>new ShaderMaterial({vertexShader:solidVertex,fragmentShader:solidFragment,side:DoubleSide,uniforms:{uColor:{value:new Color(color)},uNight:{value:1}}});
  const walls=new Mesh(geometry(wallBuffer),wallMaterial),roofs=new Mesh(geometry(roofBuffer),solid('#555c61'));
+ roofs.visible=!options.surfaceOverlay;
  const balconies=new InstancedMesh(new BoxGeometry(1,1,1),solid('#62645e'),Math.max(1,balconyTransforms.length));
  balconyTransforms.forEach((matrix,i)=>balconies.setMatrixAt(i,matrix));balconies.count=balconyTransforms.length;balconies.instanceMatrix.needsUpdate=true;
  // MapLibre supplies the projection. Its clipping differs from Three's world camera frustum.
