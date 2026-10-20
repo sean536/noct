@@ -1,0 +1,40 @@
+{
+  "kind": "synthetic-node-cpu-only",
+  "node": "v24.19.0",
+  "fixture": {
+    "roads": 26,
+    "buildings": 144,
+    "acceptedRoutes": 26,
+    "origin": [
+      0,
+      0
+    ]
+  },
+  "routeBuildMeanMs": 0.5457571000000023,
+  "routeBuildP95Ms": 1.7922979999999598,
+  "update": [
+    {
+      "vehicles": 0,
+      "meanUpdateMs": 0.000007860100000004878,
+      "p95UpdateMs": 0.000011006000000008952
+    },
+    {
+      "vehicles": 10,
+      "meanUpdateMs": 0.000805664900000002,
+      "p95UpdateMs": 0.0027665779999999814
+    },
+    {
+      "vehicles": 24,
+      "meanUpdateMs": 0.0013960544500000083,
+      "p95UpdateMs": 0.011598248000000012
+    },
+    {
+      "vehicles": 48,
+      "meanUpdateMs": 0.0024490117499999975,
+      "p95UpdateMs": 0.00618522999999999
+    }
+  ],
+  "geometryBufferBytes": 2016,
+  "maximumInstanceBufferBytes": 1536,
+  "checksum": -116924297.78893998
+}

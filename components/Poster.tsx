@@ -1,0 +1,2 @@
+import type {NightEvent} from '@/lib/events';
+export default function Poster({event,large=false}:{event:NightEvent;large?:boolean}){return <div className={`poster art-${event.art} ${large?'poster-large':''}`} aria-label={`Illustratives Demo-Artwork für ${event.name}`} role="img"><div className="art-shape"/><span className="art-top">NOCT SELECTS — DEMO</span><strong>{event.name.split(' ').map((w,i)=><span key={i}>{w}</span>)}</strong><span className="art-bottom">BERLIN / 20.10.26</span></div>}

@@ -1,0 +1,34 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.turbo/
+.vercel/
+.netlify/
+*.tsbuildinfo
+*.log
+.DS_Store
+
+# Secrets and machine-local credentials. Only the documented placeholder is shared.
+.env*
+!.env.example
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+.credentials*
+credentials*.json
+secrets*.json
+.codex/auth.json
+.claude/settings.local.json
+.openai/*
+!.openai/hosting.json
+
+# Local archives and scratch exports are not source assets.
+*.tar
+*.tar.gz
+*.zip
+tmp/
+.cache/
