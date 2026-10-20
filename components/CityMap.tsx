@@ -12,6 +12,8 @@ import {cameraPlan,arrivalBearing,FINAL_ZOOM,targetRegion} from '@/lib/camera-pl
 import type {TourStop} from '@/lib/tour';
 import {EventTour} from '@/lib/tour';
 import {TrafficLayer} from '@/lib/traffic-layer';
+import {buildingLayerWithFacades} from '@/lib/facade-state';
+import type {FacadeMap} from '@/lib/facade-map';
 export interface MapCommand {id:number;action:'center'|'zoom-in'|'zoom-out'}
 export interface FocusRequest {id:number;eventId:string;allowWhileDialog?:boolean}
 interface Props {onSelect:(e:NightEvent)=>void;activeIds:string[]|null;typing:boolean;blocked:boolean;panelOpen:boolean;searching:boolean;focusRequest:FocusRequest|null;command:MapCommand|null;onDiagnostics:(text:string)=>void}
@@ -36,7 +38,7 @@ export default function CityMap({onSelect,activeIds,typing,blocked,panelOpen,sea
   const profile=renderProfile({dpr:window.devicePixelRatio,width:container.clientWidth,height:container.clientHeight,cores:nav.hardwareConcurrency||4,memory:nav.deviceMemory,coarse:window.matchMedia('(pointer: coarse)').matches,saveData:!!nav.connection?.saveData});
   const frameBudget=new FrameBudget(profile.pixelRatio),prefetch=new TilePrefetcher(),loadedTiles=new LoadedTargetTiles();
   let warmTarget:TourStop|undefined,lastArrival='',lastTraffic='';
-  let traffic:TrafficLayer|undefined,recovery:ReturnType<typeof setTimeout>|undefined;const touches=new Set<number>();
+  let traffic:TrafficLayer|undefined,recovery:ReturnType<typeof setTimeout>|undefined,facades:FacadeMap|undefined;let facadeGeneration=0;const touches=new Set<number>();
   const began=performance.now();let firstImagery:number|undefined,firstBuildings:number|undefined,lastReport='',lastFrameP75:number|undefined;
   let labelEventId:string|undefined,labelName:HTMLElement|undefined,labelPlace:HTMLElement|undefined,labelTime:HTMLElement|undefined;
   const byId=new Map(events.map(e=>[e.id,e]));
@@ -59,7 +61,7 @@ export default function CityMap({onSelect,activeIds,typing,blocked,panelOpen,sea
   const visibility=()=>{if(document.hidden){touches.clear();controller?.pause('hidden')}else controller?.release('hidden');syncTraffic();scheduleRecovery()};
   const motion=()=>{if(media.matches)controller?.pause('reduced');else controller?.release('reduced');syncTraffic();scheduleRecovery()};
   try{
-   instance=new maplibregl.Map({container,style:{...imagery.style,light:CITY_LIGHT,sources:{...imagery.style.sources,buildings:BUILDING_SOURCE},layers:[...imagery.style.layers,BUILDING_LAYER]},center:BERLIN_CENTER,zoom:11.5,pitch:35,bearing:0,attributionControl:false,minZoom:10,maxZoom:19,maxBounds:BERLIN_BOUNDS,minPitch:30,maxPitch:65,renderWorldCopies:false,maxTileCacheSize:profile.cacheTiles,pixelRatio:profile.pixelRatio,canvasContextAttributes:{antialias:profile.antialias,preserveDrawingBuffer:false,powerPreference:profile.tier==='economy'?'low-power':'high-performance'},cancelPendingTileRequestsWhileZooming:!profile.progressive,fadeDuration:media.matches?0:180});
+   instance=new maplibregl.Map({container,style:{...imagery.style,light:CITY_LIGHT,sources:{...imagery.style.sources,buildings:BUILDING_SOURCE},layers:[...imagery.style.layers,buildingLayerWithFacades(BUILDING_LAYER)]},center:BERLIN_CENTER,zoom:11.5,pitch:35,bearing:0,attributionControl:false,minZoom:10,maxZoom:19,maxBounds:BERLIN_BOUNDS,minPitch:30,maxPitch:65,renderWorldCopies:false,maxTileCacheSize:profile.cacheTiles,pixelRatio:profile.pixelRatio,canvasContextAttributes:{antialias:profile.antialias,preserveDrawingBuffer:false,powerPreference:profile.tier==='economy'?'low-power':'high-performance'},cancelPendingTileRequestsWhileZooming:!profile.progressive,fadeDuration:media.matches?0:180});
    map.current=instance;
    if(imagery.maptiler)instance.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
    highlight.current=(event)=>{
@@ -160,7 +162,10 @@ export default function CityMap({onSelect,activeIds,typing,blocked,panelOpen,sea
    }
    container.addEventListener('pointerdown',pointerStart,{passive:true});container.addEventListener('wheel',manual,{passive:true});container.addEventListener('keydown',manual);window.addEventListener('pointerup',pointerEnd,{passive:true});window.addEventListener('pointercancel',pointerEnd,{passive:true});
    document.addEventListener('visibilitychange',visibility);media.addEventListener('change',motion);
-   instance.on('style.load',()=>{if(disposed)return;instance?.setSourceTileLodParams(profile.lodLevels,profile.lodRatio);if(instance){traffic=new TrafficLayer(profile,text=>{lastTraffic=' '+text;report()});trafficRef.current=traffic;instance.addLayer(traffic);syncTraffic();instance.on('moveend',scheduleRecovery)}controller?.start();report()});
+   instance.on('style.load',()=>{if(disposed)return;instance?.setSourceTileLodParams(profile.lodLevels,profile.lodRatio);if(instance){traffic=new TrafficLayer(profile,text=>{lastTraffic=' '+text;report()});trafficRef.current=traffic;instance.addLayer(traffic);syncTraffic();instance.on('moveend',scheduleRecovery)}controller?.start();report();
+    const generation=++facadeGeneration;facades?.destroy();facades=undefined;
+    void import('@/lib/facade-map').then(({FacadeMap})=>{if(!disposed&&instance&&generation===facadeGeneration)facades=new FacadeMap(instance,{mobile:profile.tier==='economy'||media.matches||window.matchMedia('(pointer: coarse)').matches});}).catch(()=>{/* Original buildings remain the fallback if the optional renderer cannot load. */});
+   });
    instance.on('sourcedata',e=>{
     if(disposed)return;
     loadedTiles.record(e);
@@ -192,7 +197,7 @@ export default function CityMap({onSelect,activeIds,typing,blocked,panelOpen,sea
     if(action==='zoom-in')instance?.zoomIn({duration});if(action==='zoom-out')instance?.zoomOut({duration});
    };
   }catch{if(!disposed)setStatus('webgl')}
-  return()=>{disposed=true;clearTimeout(timeout);if(recovery)clearTimeout(recovery);recoverHandler.current=()=>{};trafficRef.current=null;controller?.destroy();prefetch.destroy();tour.current=null;commandHandler.current=null;label?.remove();container.removeEventListener('pointerdown',pointerStart);container.removeEventListener('wheel',manual);container.removeEventListener('keydown',manual);window.removeEventListener('pointerup',pointerEnd);window.removeEventListener('pointercancel',pointerEnd);document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',motion);pins.current=[];highlight.current=()=>{};instance?.remove();map.current=null};
+  return()=>{disposed=true;facadeGeneration++;facades?.destroy();clearTimeout(timeout);if(recovery)clearTimeout(recovery);recoverHandler.current=()=>{};trafficRef.current=null;controller?.destroy();prefetch.destroy();tour.current=null;commandHandler.current=null;label?.remove();container.removeEventListener('pointerdown',pointerStart);container.removeEventListener('wheel',manual);container.removeEventListener('keydown',manual);window.removeEventListener('pointerup',pointerEnd);window.removeEventListener('pointercancel',pointerEnd);document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',motion);pins.current=[];highlight.current=()=>{};instance?.remove();map.current=null};
  },[retry]);
  useEffect(()=>{if(command)commandHandler.current?.(command.action)},[command]);
  useEffect(()=>{

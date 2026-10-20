@@ -1,0 +1,219 @@
+{
+  "environment": "Chromium, headless SwiftShader software renderer; not a physical iPhone",
+  "checks": [
+    "desktop: 16 synthetic footprints rendered, shader compile succeeded",
+    "same-camera before/after switch",
+    "day/night lighting toggles",
+    "three rapid camera targets replace prior flight",
+    "zoom and right-drag rotation keep scene ready",
+    "390x844 touch viewport: no horizontal overflow; 44px buttons",
+    "dynamic reduced-motion disables benchmark animations",
+    "reduced-motion on first visit",
+    "blocked live services: honest error, zero fake buildings",
+    "reload rebuilds deterministic scene",
+    "WebGL context loss/restoration rebuilds isolated scene"
+  ],
+  "errors": [],
+  "measurements": {
+    "desktopBefore": {
+      "recordedAt": "2026-10-20T18:17:31.866Z",
+      "source": "fixture",
+      "origin": [
+        13.44508,
+        52.49922
+      ],
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+      "devicePixelRatio": 1,
+      "visibility": {
+        "original": "none",
+        "comparison": "visible",
+        "facades": false
+      },
+      "metrics": {
+        "buildings": 16,
+        "triangles": 4518,
+        "geometryBytes": 31728,
+        "instanceBytes": 23040,
+        "balconies": 72,
+        "reduced": false,
+        "calls": 0,
+        "meanCpuMs": 0,
+        "geometries": 3,
+        "textures": 0,
+        "ready": true
+      },
+      "measurements": [
+        {
+          "mode": "before",
+          "frames": 39,
+          "renderHz": 7.368910952522312,
+          "p95Ms": 275.1000000014901,
+          "cpuMs": 0,
+          "calls": 0,
+          "geometryKiB": 0,
+          "heapMiB": 15.510553359985352
+        }
+      ],
+      "limitations": [
+        "Render cadence, not GPU time",
+        "JS heap excludes GPU/tile memory",
+        "Synthetic geometry is not Berlin building data"
+      ]
+    },
+    "desktopAfter": {
+      "recordedAt": "2026-10-20T18:17:38.344Z",
+      "source": "fixture",
+      "origin": [
+        13.44508,
+        52.49922
+      ],
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+      "devicePixelRatio": 1,
+      "visibility": {
+        "original": "none",
+        "comparison": "none",
+        "facades": true
+      },
+      "metrics": {
+        "buildings": 16,
+        "triangles": 4518,
+        "geometryBytes": 31728,
+        "instanceBytes": 23040,
+        "balconies": 72,
+        "reduced": true,
+        "calls": 2,
+        "meanCpuMs": 0.5444444455206394,
+        "geometries": 3,
+        "textures": 0,
+        "ready": true
+      },
+      "measurements": [
+        {
+          "mode": "before",
+          "frames": 39,
+          "renderHz": 7.368910952522312,
+          "p95Ms": 275.1000000014901,
+          "cpuMs": 0,
+          "calls": 0,
+          "geometryKiB": 0,
+          "heapMiB": 15.510553359985352
+        },
+        {
+          "mode": "after",
+          "frames": 33,
+          "renderHz": 6.439927550815053,
+          "p95Ms": 371.79999999701977,
+          "cpuMs": 0.564705883317134,
+          "calls": 2,
+          "geometryKiB": 53.484375,
+          "heapMiB": 19.568209648132324
+        }
+      ],
+      "limitations": [
+        "Render cadence, not GPU time",
+        "JS heap excludes GPU/tile memory",
+        "Synthetic geometry is not Berlin building data"
+      ]
+    },
+    "mobileBefore": {
+      "recordedAt": "2026-10-20T18:17:55.333Z",
+      "source": "fixture",
+      "origin": [
+        13.44508,
+        52.49922
+      ],
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+      "devicePixelRatio": 3,
+      "visibility": {
+        "original": "none",
+        "comparison": "visible",
+        "facades": false
+      },
+      "metrics": {
+        "buildings": 16,
+        "triangles": 4518,
+        "geometryBytes": 31728,
+        "instanceBytes": 23040,
+        "balconies": 72,
+        "reduced": false,
+        "calls": 0,
+        "meanCpuMs": 0,
+        "geometries": 3,
+        "textures": 0,
+        "ready": true
+      },
+      "measurements": [
+        {
+          "mode": "before",
+          "frames": 62,
+          "renderHz": 11.932473934387477,
+          "p95Ms": 172.39999999850988,
+          "cpuMs": 0,
+          "calls": 0,
+          "geometryKiB": 0,
+          "heapMiB": 15.594783782958984
+        }
+      ],
+      "limitations": [
+        "Render cadence, not GPU time",
+        "JS heap excludes GPU/tile memory",
+        "Synthetic geometry is not Berlin building data"
+      ]
+    },
+    "mobileAfter": {
+      "recordedAt": "2026-10-20T18:18:01.053Z",
+      "source": "fixture",
+      "origin": [
+        13.44508,
+        52.49922
+      ],
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+      "devicePixelRatio": 3,
+      "visibility": {
+        "original": "none",
+        "comparison": "none",
+        "facades": true
+      },
+      "metrics": {
+        "buildings": 16,
+        "triangles": 4518,
+        "geometryBytes": 31728,
+        "instanceBytes": 23040,
+        "balconies": 72,
+        "reduced": true,
+        "calls": 2,
+        "meanCpuMs": 0.6843137253148883,
+        "geometries": 3,
+        "textures": 0,
+        "ready": true
+      },
+      "measurements": [
+        {
+          "mode": "before",
+          "frames": 62,
+          "renderHz": 11.932473934387477,
+          "p95Ms": 172.39999999850988,
+          "cpuMs": 0,
+          "calls": 0,
+          "geometryKiB": 0,
+          "heapMiB": 15.594783782958984
+        },
+        {
+          "mode": "after",
+          "frames": 47,
+          "renderHz": 9.056544337685661,
+          "p95Ms": 212,
+          "cpuMs": 0.7083333331781129,
+          "calls": 2,
+          "geometryKiB": 53.484375,
+          "heapMiB": 12.441238403320312
+        }
+      ],
+      "limitations": [
+        "Render cadence, not GPU time",
+        "JS heap excludes GPU/tile memory",
+        "Synthetic geometry is not Berlin building data"
+      ]
+    }
+  }
+}
