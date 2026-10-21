@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>NOCT – UI-Prototyp</title>
+<!--
+ÜBERGABE AN CODEX
+1. KARTE: <div id="map-slot" data-map-slot> ist der einzige Platzhalter. Ersetzen/entfernen → echte MapLibre-Karte (z-index 0) bleibt sichtbar. Die Demo-Pins liegen im Slot und entfallen mit ihm (Marker kommen aus MapLibre).
+2. UI-Ebene: .ui + .sheet liegen auf z-index ≥ 10 und sind map-agnostisch. Einzige Schnittstelle: Events (EV), Callback openEvent(id) für Marker-Klicks, flyTo-Hook in setCity().
+3. Komponenten: Header(Stadt) · Hero(Composer, Chips) · TabBar · ChatSheet · EventCard · DetailSheet · SavedSheet · FilterSheet · Toast.
+4. Tokens: siehe :root (Farben, Radien, Abstände, Easing).
+-->
+<style>
+:root{
+  --bg:#F5F5F7; --card:#FFFFFF; --ink:#1C1C1E; --mute:#8E8E93; --faint:#AEAEB2; --fill:#E5E5EA;
+  --line:rgba(60,60,67,.12); --r-sheet:28px; --r-card:18px; --r-pill:999px;
+  --s1:8px; --s2:16px; --s3:24px; --ease:cubic-bezier(.22,1,.36,1); --dur:.5s;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px);
+  --float:0 0 0 .5px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.05),0 8px 28px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* ===== KARTEN-PLATZHALTER (entfernen) ===== */
+#map-slot{position:fixed;inset:0;z-index:0;overflow:hidden;background:radial-gradient(40% 35% at 25% 30%,#F1F1F3,transparent 80%),radial-gradient(35% 30% at 78% 72%,#DADADF,transparent 80%),#E6E6EA}
+#map-slot::before{content:"";position:absolute;inset:-20%;background-image:linear-gradient(rgba(255,255,255,.85) 2px,transparent 2px),linear-gradient(90deg,rgba(255,255,255,.85) 2px,transparent 2px);background-size:76px 76px;transform:rotate(-14deg)}
+#map-slot .label{position:absolute;left:50%;top:40%;transform:translateX(-50%);font-size:12px;color:var(--mute);white-space:nowrap}
+.pin{position:absolute;width:14px;height:14px;border-radius:50%;background:var(--ink);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.28);transform:translate(-50%,-50%);transition:transform .35s var(--ease),opacity .3s}
+.pin:hover,.pin.on{transform:translate(-50%,-50%) scale(1.45)}
+.pin.off{opacity:0;pointer-events:none}
+
+/* ===== UI-EBENE ===== */
+.ui{position:fixed;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;padding:calc(var(--s1) + env(safe-area-inset-top,0px)) var(--s2) calc(var(--s1) + env(safe-area-inset-bottom,0px))}
+.ui>*{pointer-events:auto}
+.glass{background:rgba(255,255,255,.74);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8);box-shadow:var(--float)}
+header{display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+header>*{pointer-events:auto}
+.logo{font-weight:700;letter-spacing:.24em;font-size:11px;color:var(--ink);padding-left:2px}
+.pill{height:36px;padding:0 14px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;transition:transform .25s var(--ease)}
+.pill:active{transform:scale(.96)}
+#filterBtn{width:36px;padding:0;justify-content:center;position:relative}
+.badge{min-width:16px;height:16px;border-radius:8px;background:var(--ink);color:#fff;font-size:10px;font-weight:600;display:grid;place-items:center;padding:0 4px}
+#filterBtn .badge{position:absolute;top:-4px;right:-4px}
+.cities{position:absolute;top:calc(var(--safe-t) + 52px);left:var(--s2);border-radius:18px;padding:6px;display:none;flex-direction:column;min-width:180px;z-index:30;background:rgba(255,255,255,.92)}
+.cities.open{display:flex}
+.cities button{text-align:left;padding:11px 12px;border-radius:12px;font-size:15px;display:flex;justify-content:space-between}
+.cities button[aria-checked=true]{background:var(--fill)}
+.cities button:hover{background:rgba(60,60,67,.06)}
+
+.hero{margin:auto 0 12px;max-width:440px;width:100%;align-self:center;text-align:center;padding:0 4px;transition:opacity .4s var(--ease),transform .5s var(--ease)}
+.hero.away{opacity:0;transform:translateY(16px);pointer-events:none}
+h1{font-size:clamp(19px,5.2vw,23px);line-height:1.2;font-weight:600;letter-spacing:-.015em;margin-bottom:12px;text-shadow:0 0 14px rgba(255,255,255,.9)}
+.composer{display:flex;align-items:center;gap:8px;height:46px;border-radius:var(--r-pill);padding:0 5px 0 18px;background:rgba(255,255,255,.94)}
+.composer input{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit;font-size:16px;outline:0}
+.composer input::placeholder{color:var(--mute)}
+.send svg{width:15px;height:15px}
+.send{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;transition:transform .25s var(--ease)}
+.send:active{transform:scale(.9)}
+.chips{display:flex;gap:6px;justify-content:safe center;overflow-x:auto;scrollbar-width:none;margin-top:12px;padding:2px 0 6px}
+.chip{flex:none;height:30px;padding:0 13px;border-radius:var(--r-pill);font-size:13px;font-weight:500;color:#3A3A3C;background:rgba(229,229,234,.88);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:none;transition:all .25s var(--ease)}
+.chip:hover{background:#D1D1D6}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff}
+
+.tabbar{align-self:center;display:flex;gap:2px;padding:4px;border-radius:var(--r-pill);margin-bottom:2px;position:relative;z-index:40}
+.tab{position:relative;width:56px;height:40px;border-radius:var(--r-pill);display:grid;place-items:center;color:var(--mute);transition:color .3s,background .4s var(--ease),transform .25s var(--ease)}
+.tab:active{transform:scale(.92)}
+.tab svg{width:22px;height:22px;stroke-width:1.6}
+.tab[aria-selected=true]{color:var(--ink);background:rgba(60,60,67,.1)}
+.tab .badge{position:absolute;top:7px;right:12px;min-width:7px;width:7px;height:7px;padding:0;font-size:0}
+
+/* ===== SHEETS ===== */
+.scrim{position:fixed;inset:0;z-index:19;background:rgba(0,0,0,.14);opacity:0;pointer-events:none;transition:opacity .4s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;z-index:20;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 68px);height:min(66dvh,600px);border-radius:var(--r-sheet);background:rgba(245,245,247,.9);-webkit-backdrop-filter:blur(40px) saturate(1.8);backdrop-filter:blur(40px) saturate(1.8);display:flex;flex-direction:column;overflow:hidden;transform:translateY(calc(100% + 120px));opacity:0;visibility:hidden;transition:transform var(--dur) var(--ease),opacity .3s,visibility 0s .5s}
+.sheet.open{transform:none;opacity:1;visibility:visible;transition:transform var(--dur) var(--ease),opacity .3s}
+.sheet.tall{height:min(86dvh,760px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:25}
+.sheet.short{height:auto;max-height:70dvh}
+.grab{width:36px;height:5px;border-radius:3px;background:rgba(60,60,67,.22);margin:8px auto 0;flex:none}
+.sh-head{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 6px;flex:none}
+.sh-head h2{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.x{width:30px;height:30px;border-radius:50%;background:rgba(60,60,67,.12);color:#636366;display:grid;place-items:center;flex:none;font-size:13px}
+.scroll{overflow-y:auto;padding:8px 16px 20px;flex:1;-webkit-overflow-scrolling:touch}
+
+/* Chat */
+.msg{max-width:84%;padding:10px 15px;border-radius:19px;font-size:16px;line-height:1.38;margin-bottom:8px;animation:in .45s var(--ease)}
+.msg.ai{background:#fff;border-bottom-left-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.msg.me{background:var(--ink);color:#fff;margin-left:auto;border-bottom-right-radius:6px}
+.typing{display:inline-flex;gap:4px;padding:15px}.typing i{width:6px;height:6px;border-radius:50%;background:var(--faint);animation:dot 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{opacity:.3;transform:translateY(-3px)}}
+@keyframes in{from{opacity:0;transform:translateY(10px)}}
+.chat-foot{padding:6px 12px 12px;flex:none}
+.chat-foot .composer{height:44px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08)}
+
+/* Event-Karte */
+.card{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:10px 6px 10px 10px;border-radius:var(--r-card);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05);margin-bottom:8px;transition:transform .3s var(--ease);animation:in .5s var(--ease)}
+.card:active{transform:scale(.985)}
+.art{width:62px;height:62px;border-radius:14px;flex:none;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06)}
+.card .body{flex:1;min-width:0}
+.card h3{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sub{font-size:13px;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .meta{font-size:13px;font-weight:500;margin-top:6px;display:flex;gap:6px;align-items:center}
+.tag{font-size:11px;font-weight:500;padding:2px 8px;border-radius:var(--r-pill);background:var(--fill);color:#636366}
+.heart{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--faint);transition:transform .35s var(--ease),color .2s}
+.heart svg{width:21px;height:21px}
+.heart[aria-pressed=true]{color:var(--ink)}.heart[aria-pressed=true] svg{fill:currentColor}
+.heart.pop{animation:pop .45s var(--ease)}@keyframes pop{40%{transform:scale(1.3)}}
+
+/* Detail */
+.hero-art{height:190px;flex:none;position:relative}
+.hero-art::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,#F5F5F7)}
+.hero-art .x{position:absolute;top:14px;right:14px;z-index:2;background:rgba(255,255,255,.8)}
+.demo{position:absolute;left:16px;top:16px;z-index:2;font-size:11px;font-weight:500;padding:4px 10px;border-radius:var(--r-pill);background:rgba(255,255,255,.8);color:#636366}
+.d-body{padding:0 20px 8px;margin-top:-30px;position:relative;z-index:1}
+.d-body h2{font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.12;margin-bottom:4px}
+.d-body p{color:#48484A;line-height:1.5;font-size:15px;margin:16px 0}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.fact{padding:12px 14px;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.fact small{display:block;color:var(--mute);font-size:12px;margin-bottom:2px}.fact b{font-weight:600;font-size:15px}
+.actions{display:flex;gap:8px;padding:10px 16px 16px;flex:none}
+.btn{flex:1;height:50px;border-radius:15px;font-weight:600;font-size:16px;transition:transform .25s var(--ease)}
+.btn:active{transform:scale(.97)}
+.btn.main{background:var(--ink);color:#fff}.btn.sec{background:var(--fill);color:var(--ink)}
+.btn.sec[aria-pressed=true]{background:#fff;box-shadow:inset 0 0 0 1.5px var(--ink)}
+
+/* Filter */
+.group{margin-bottom:20px}.group h4{font-size:13px;color:var(--mute);font-weight:500;margin-bottom:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.row .chip{height:34px;font-size:14px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.row .chip[aria-pressed=true]{background:var(--ink)}
+.empty{text-align:center;color:var(--mute);padding:48px 24px;line-height:1.5}
+.toast{position:fixed;z-index:60;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translate(-50%,-16px);padding:11px 18px;border-radius:var(--r-pill);font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:all .45s var(--ease);white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Desktop */
+@media (min-width:900px){
+  .ui{padding:24px 32px}
+  .sheet{left:auto;right:24px;top:24px;bottom:96px;width:420px;height:auto;transform:translateX(calc(100% + 60px))}
+  .sheet.open{transform:none}
+  .sheet.tall{top:24px;bottom:24px;height:auto;width:460px;right:24px}
+  .sheet.short{top:auto;bottom:96px;max-height:70dvh}
+  body.panel .hero{transform:translateX(-210px)}
+  .cities{top:68px;left:32px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+
+<!-- KARTEN-SLOT: Platzhalter. Entfernen, damit die echte MapLibre-Karte sichtbar ist. -->
+<div id="map-slot" data-map-slot><span class="label">Platzhalter für die 3D-Karte (Demo)</span></div>
+
+<div class="ui">
+  <header>
+    <button class="pill glass" id="cityBtn" aria-haspopup="true" aria-expanded="false">
+      <span class="logo" style="padding:0">NOCT</span><span style="color:var(--faint)">|</span><span id="cityLabel">Berlin</span>
+      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+    </button>
+    <button class="pill glass" id="filterBtn" aria-label="Filter öffnen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      <span class="badge" id="fCount" hidden>1</span>
+    </button>
+  </header>
+
+  <div class="cities glass" id="cities" role="menu"></div>
+
+  <main class="hero" id="hero">
+    <h1>Worauf hast du heute Lust?</h1>
+    <form class="composer glass" id="homeForm" autocomplete="off">
+      <input id="homeInput" placeholder="Frag NOCT …" aria-label="Frag NOCT">
+      <button class="send" aria-label="Senden"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </form>
+    <div class="chips" id="chips"></div>
+  </main>
+
+  <nav class="tabbar glass" role="tablist">
+    <button class="tab" role="tab" data-tab="map" aria-label="Karte" aria-selected="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></button>
+    <button class="tab" role="tab" data-tab="chat" aria-label="Chat" aria-selected="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4V5z"/></svg></button>
+    <button class="tab" role="tab" data-tab="saved" aria-label="Gemerkt" aria-selected="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.600-7 10-7 10z"/></svg><span class="badge" id="sCount" hidden>0</span></button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<section class="sheet glass" id="chat" aria-label="Chat">
+  <div class="grab"></div>
+  <div class="sh-head"><h2>Concierge</h2><button class="x" data-close aria-label="Schließen">✕</button></div>
+  <div class="scroll" id="msgs"></div>
+  <div class="chat-foot"><form class="composer glass" id="chatForm" autocomplete="off"><input id="chatInput" placeholder="Nachricht …" aria-label="Nachricht"><button class="send" aria-label="Senden"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></form></div>
+</section>
+
+<section class="sheet glass" id="saved" aria-label="Gemerkte Events">
+  <div class="grab"></div>
+  <div class="sh-head"><h2>Gemerkt</h2><button class="x" data-close aria-label="Schließen">✕</button></div>
+  <div class="scroll" id="savedList"></div>
+</section>
+
+<section class="sheet glass short" id="filter" aria-label="Filter">
+  <div class="grab"></div>
+  <div class="sh-head"><h2>Filter</h2><button class="x" data-close aria-label="Schließen">✕</button></div>
+  <div class="scroll">
+    <div class="group"><h4>Musikrichtung</h4><div class="row" id="fGenre"></div></div>
+    <div class="group"><h4>Eintritt</h4><div class="row" id="fPrice"></div></div>
+  </div>
+  <div class="actions"><button class="btn sec" id="fReset">Zurücksetzen</button><button class="btn main" data-close>Fertig</button></div>
+</section>
+
+<section class="sheet glass tall" id="detail" aria-label="Eventdetails"></section>
+<div class="toast glass" id="toast" role="status"></div>
+
+<script>
+/* ===== DEMO-DATEN (alle gekennzeichnet) ===== */
+const EV=[
+ {id:1,city:'Berlin',t:'Sunset Afro Sessions',v:'Rooftop Kreuzberg',g:['Afro','Rooftop'],d:'Heute',tm:'18:00',p:12,x:62,y:38,a:['#F4F4F6','#C7C7CC'],txt:'Amapiano und Afrobeats über den Dächern von Kreuzberg. Gäste legen ab Sonnenuntergang auf.'},
+ {id:2,city:'Berlin',t:'Halle 7 – Techno',v:'Friedrichshain Warehouse',g:['Techno'],d:'Heute',tm:'23:00',p:18,x:28,y:55,a:['#D1D1D6','#8E8E93'],txt:'Drei Floors, ein Sound. Langer Einlass, klare Musikrichtung, kein Dresscode-Theater.'},
+ {id:3,city:'Berlin',t:'House & Vermouth',v:'Bar Mitte',g:['House','Bars'],d:'Heute',tm:'20:00',p:0,x:50,y:28,a:['#EDEDF0','#AEAEB2'],txt:'Entspannter Abend mit Deep House an der Bar. Eintritt frei, Plätze begrenzt.'},
+ {id:4,city:'Berlin',t:'Moonlight Rooftop',v:'Neukölln Skydeck',g:['Rooftop','House'],d:'Morgen',tm:'21:00',p:15,x:72,y:64,a:['#E5E5EA','#B8B8BD'],txt:'Open-Air mit Blick über Neukölln. Bei Regen wechselt die Veranstaltung nach drinnen.'},
+ {id:5,city:'Berlin',t:'Afro Roots Night',v:'Wedding Club',g:['Afro'],d:'Sa',tm:'22:00',p:10,x:38,y:22,a:['#F0F0F2','#9A9AA0'],txt:'Live-Percussion trifft DJ-Set. Früh kommen lohnt sich.'},
+ {id:6,city:'Hamburg',t:'Hafen Techno',v:'Speicherstadt Loft',g:['Techno'],d:'Heute',tm:'23:30',p:14,x:45,y:45,a:['#DCDCE0','#8E8E93'],txt:'Industrial-Atmosphäre am Wasser.'},
+ {id:7,city:'Hamburg',t:'Elbe Rooftop',v:'Altona Deck',g:['Rooftop','Bars'],d:'Morgen',tm:'19:00',p:0,x:60,y:55,a:['#F2F2F4','#BCBCC1'],txt:'Cocktails mit Blick auf die Elbe.'},
+ {id:8,city:'London',t:'Soho House Night',v:'Shoreditch Basement',g:['House'],d:'Heute',tm:'22:00',p:20,x:50,y:40,a:['#E0E0E4','#A4A4AA'],txt:'Klassischer Londoner House-Abend.'}
+];
+const GENRES=['Afro','Techno','House','Rooftop','Bars'];
+const PRICES=[['all','Alle'],['free','Frei'],['15','Bis 15 €']];
+
+/* ===== STATE ===== */
+const S={city:'Berlin',saved:new Set(),genre:null,price:'all',open:null,detail:null};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const ICON_HEART='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.600-7 10-7 10z"/></svg>';
+const price=p=>p?p+' €':'Frei';
+const byId=id=>EV.find(e=>e.id==id);
+const visible=()=>EV.filter(e=>e.city===S.city&&(!S.genre||e.g.includes(S.genre))&&(S.price==='all'||(S.price==='free'?e.p===0:e.p<=15)));
+
+/* ===== Toast ===== */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1900)}
+
+/* ===== Sheets ===== */
+function openSheet(id){
+  ['chat','saved','filter'].forEach(s=>{if(s!==id)$('#'+s).classList.remove('open')});
+  if(id)$('#'+id).classList.add('open');
+  const any=!!id;
+  $('#hero').classList.toggle('away',any&&id==='chat'||any&&innerWidth<900);
+  document.body.classList.toggle('panel',any);
+  $('#scrim').classList.toggle('on',(any&&innerWidth<900)||!!S.detail);
+  const tab=id==='chat'||id==='saved'?id:'map';
+  $$('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
+  S.open=id;
+}
+function closeAll(){closeDetail();openSheet(null)}
+$$('[data-close]').forEach(b=>b.onclick=()=>b.closest('#detail')?closeDetail():openSheet(null));
+$('#scrim').onclick=()=>S.detail?closeDetail():openSheet(null);
+$$('.tab').forEach(b=>b.onclick=()=>{closeDetail();b.dataset.tab==='map'?openSheet(null):(b.dataset.tab==='chat'&&startChat(),openSheet(b.dataset.tab))});
+addEventListener('keydown',e=>{if(e.key==='Escape'){$('#cities').classList.remove('open');S.detail?closeDetail():openSheet(null)}});
+
+/* ===== Event-Karte ===== */
+function card(e){
+  const b=document.createElement('div');b.className='card';b.tabIndex=0;b.setAttribute('role','button');b.dataset.id=e.id;
+  b.innerHTML=`<div class="art" style="background:linear-gradient(145deg,${e.a[0]},${e.a[1]})"></div>
+  <div class="body"><h3>${e.t}</h3><div class="sub">${e.v} · ${e.d}, ${e.tm}</div>
+  <div class="meta"><span>${price(e.p)}</span>${e.g.map(x=>`<span class="tag">${x}</span>`).join('')}</div></div>
+  <button class="heart" aria-label="Merken" aria-pressed="${S.saved.has(e.id)}">${ICON_HEART}</button>`;
+  b.onclick=ev=>{if(ev.target.closest('.heart'))return;showDetail(e.id)};
+  b.onkeydown=ev=>{if(ev.key==='Enter')showDetail(e.id)};
+  b.querySelector('.heart').onclick=ev=>{ev.stopPropagation();toggleSave(e.id,ev.currentTarget)};
+  return b;
+}
+
+/* ===== Merkliste ===== */
+function toggleSave(id,btn){
+  const on=!S.saved.has(id);on?S.saved.add(id):S.saved.delete(id);
+  if(btn){btn.classList.remove('pop');void btn.offsetWidth;btn.classList.add('pop')}
+  toast(on?'Gemerkt':'Entfernt');sync();
+}
+function sync(){
+  const n=S.saved.size;$('#sCount').hidden=!n;$('#sCount').textContent=n;
+  $$('.card').forEach(c=>c.querySelector('.heart').setAttribute('aria-pressed',S.saved.has(+c.dataset.id)));
+  const sb=$('#dSave');if(sb)sb.setAttribute('aria-pressed',S.saved.has(S.detail));
+  renderSaved();
+}
+function renderSaved(){
+  const L=$('#savedList');L.innerHTML='';
+  const items=[...S.saved].map(byId);
+  if(!items.length){L.innerHTML='<div class="empty">Noch nichts gemerkt.<br>Tippe auf das Herz, um ein Event zu sichern.</div>';return}
+  items.forEach(e=>L.appendChild(card(e)));
+}
+
+/* ===== Detail ===== */
+function showDetail(id){
+  const e=byId(id);S.detail=id;
+  document.querySelectorAll('.pin').forEach(p=>p.classList.toggle('on',p.dataset.id==id));
+  const d=$('#detail');
+  d.innerHTML=`<div class="hero-art" style="background:linear-gradient(145deg,${e.a[0]},${e.a[1]})"><span class="demo">Demo-Daten</span><button class="x" id="dX" aria-label="Schließen">✕</button></div>
+  <div class="scroll" style="padding:0"><div class="d-body"><h2>${e.t}</h2><div style="color:var(--mute)">${e.v}, ${e.city}</div>
+  <div class="row" style="margin-top:12px">${e.g.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+  <div class="facts"><div class="fact"><small>Datum</small><b>${e.d}</b></div><div class="fact"><small>Beginn</small><b>${e.tm} Uhr</b></div><div class="fact"><small>Eintritt</small><b>${price(e.p)}</b></div><div class="fact"><small>Ort</small><b>${e.v}</b></div></div>
+  <p>${e.txt}</p></div></div>
+  <div class="actions"><button class="btn sec" id="dSave" aria-pressed="${S.saved.has(id)}">Merken</button><button class="btn main" id="dTix">${e.p?'Tickets':'Eintritt frei'}</button></div>`;
+  d.classList.add('open');$('#scrim').classList.add('on');
+  $('#dX').onclick=closeDetail;
+  $('#dSave').onclick=()=>toggleSave(id);
+  $('#dTix').onclick=()=>toast('Demo: Ticketlink folgt in der echten App');
+}
+function closeDetail(){
+  S.detail=null;$('#detail').classList.remove('open');
+  document.querySelectorAll('.pin').forEach(p=>p.classList.remove('on'));
+  $('#scrim').classList.toggle('on',S.open&&innerWidth<900);
+}
+window.openEvent=showDetail; // Hook für Marker-Klicks der echten Karte
+
+/* ===== Chat ===== */
+let started=false;
+function addMsg(txt,who){const m=document.createElement('div');m.className='msg '+who;m.textContent=txt;$('#msgs').appendChild(m);scrollEnd();return m}
+function scrollEnd(){const s=$('#msgs');s.scrollTo({top:s.scrollHeight,behavior:'smooth'})}
+function startChat(){if(started)return;started=true;addMsg('Guten Abend. Wonach ist dir heute?','ai')}
+function ask(q){
+  startChat();openSheet('chat');addMsg(q,'me');
+  const ty=document.createElement('div');ty.className='msg ai typing';ty.innerHTML='<i></i><i></i><i></i>';$('#msgs').appendChild(ty);scrollEnd();
+  setTimeout(()=>{
+    ty.remove();
+    const low=q.toLowerCase();
+    const keys=GENRES.filter(g=>low.includes(g.toLowerCase().replace(/s$/,'')));
+    let hits=EV.filter(e=>e.city===S.city&&(!keys.length||keys.some(k=>e.g.includes(k)))).slice(0,3);
+    const exact=hits.length&&keys.length;
+    if(!hits.length)hits=EV.filter(e=>e.city===S.city).slice(0,2);
+    addMsg(exact||!keys.length?`Das passt heute in ${S.city} zu dir:`:`Dazu finde ich in ${S.city} nichts. Das kommt dem am nächsten:`,'ai');
+    hits.forEach(e=>$('#msgs').appendChild(card(e)));scrollEnd();
+  },900);
+}
+$('#homeForm').onsubmit=e=>{e.preventDefault();const v=$('#homeInput').value.trim();if(!v)return;$('#homeInput').value='';ask(v)};
+$('#chatForm').onsubmit=e=>{e.preventDefault();const v=$('#chatInput').value.trim();if(!v)return;$('#chatInput').value='';ask(v)};
+$('#chips').innerHTML=GENRES.map(g=>`<button class="chip glass">${g}</button>`).join('');
+$$('#chips .chip').forEach(c=>c.onclick=()=>ask(c.textContent));
+
+/* ===== Stadt ===== */
+const CITIES=['Berlin','Hamburg','London'];
+$('#cities').innerHTML=CITIES.map(c=>`<button role="menuitemradio" aria-checked="${c==='Berlin'}">${c}<span style="color:var(--ink)">${c==='Berlin'?'✓':''}</span></button>`).join('');
+$('#cityBtn').onclick=()=>{const o=$('#cities').classList.toggle('open');$('#cityBtn').setAttribute('aria-expanded',o)};
+$$('#cities button').forEach(b=>b.onclick=()=>setCity(b.firstChild.textContent));
+function setCity(c){
+  S.city=c;$('#cityLabel').textContent=c;$('#cities').classList.remove('open');
+  $$('#cities button').forEach(b=>{const on=b.firstChild.textContent===c;b.setAttribute('aria-checked',on);b.lastChild.textContent=on?'✓':''});
+  // HOOK: map.flyTo({center: CITY_CENTER[c]}) in der echten App
+  renderPins();toast(c);
+}
+
+/* ===== Filter ===== */
+function renderFilter(){
+  $('#fGenre').innerHTML=['Alle',...GENRES].map(g=>`<button class="chip glass" aria-pressed="${(g==='Alle'&&!S.genre)||g===S.genre}">${g}</button>`).join('');
+  $('#fPrice').innerHTML=PRICES.map(([k,l])=>`<button class="chip glass" data-k="${k}" aria-pressed="${S.price===k}">${l}</button>`).join('');
+  $$('#fGenre .chip').forEach(b=>b.onclick=()=>{S.genre=b.textContent==='Alle'?null:b.textContent;applyFilter()});
+  $$('#fPrice .chip').forEach(b=>b.onclick=()=>{S.price=b.dataset.k;applyFilter()});
+}
+function applyFilter(){renderFilter();renderPins();const n=(S.genre?1:0)+(S.price!=='all'?1:0);$('#fCount').hidden=!n;$('#fCount').textContent=n}
+$('#fReset').onclick=()=>{S.genre=null;S.price='all';applyFilter()};
+$('#filterBtn').onclick=()=>openSheet(S.open==='filter'?null:'filter');
+
+/* ===== Demo-Pins (Teil des Karten-Platzhalters) ===== */
+function renderPins(){
+  const slot=$('#map-slot');slot.querySelectorAll('.pin').forEach(p=>p.remove());
+  const vis=new Set(visible().map(e=>e.id));
+  EV.filter(e=>e.city===S.city).forEach(e=>{
+    const p=document.createElement('button');p.className='pin'+(vis.has(e.id)?'':' off');
+    p.style.left=e.x+'%';p.style.top=e.y+'%';p.dataset.id=e.id;p.setAttribute('aria-label',e.t);
+    p.onclick=()=>showDetail(e.id);slot.appendChild(p);
+  });
+}
+renderFilter();renderPins();renderSaved();
+</script>
+</body>
+</html>
