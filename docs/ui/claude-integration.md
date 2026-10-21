@@ -43,3 +43,11 @@ Chromium mit Mobil-/Touch-Viewports und kontrolliertem Visual-Viewport-Signal is
 - Gemessener Kontrast des unmarkierten Herzsymbols auf der weißen Karte: 3,26:1. Inaktive Navigationssymbole auf dem transparenten Glas: mindestens 3,17:1 über den geprüften schwarzen/weißen Untergrenzen. Eingaben nutzen den abgerundeten äußeren Fokusring statt einer zusätzlichen rechteckigen Innenkontur.
 
 Screenshots, ausführbare Browserprüfungen und Rohprotokolle liegen außerhalb des Repositories unter `/workspace/work/noct-ui-integration/`. Sie dokumentieren den oben begrenzten Prüfumfang und sind kein Ersatz für die interaktive Entwicklungswebsite.
+
+## Wiederaufnahme und GitHub-Sicherung
+
+Nach der Limit-Unterbrechung blieb der vollständige Workspace erhalten. Die Integration wurde ohne erneute Entwicklung sofort als WIP-Checkpoint `984635b` auf `feature/noct-3d` gesichert und gepusht. Commit `17c513e` verankert die verbindlichen automatischen Entwicklungs-Checkpoints in `AGENTS.md`.
+
+Bei der Wiederaufnahme bestanden erneut 93 Tests, TypeScript und Produktionsbuild. Die drei unveränderten Browserprüfungen bestanden ebenfalls erneut: vollständige Root-App mit 25 Verhaltensgruppen auf vier Viewports, drei gezielte Eingabe-/Detail-/Budgetregressionen und die separate mobile Dialogprüfung. Ein nach der Unterbrechung nicht mehr antwortender lokaler QA-Server wurde vor dem erfolgreichen Lauf neu gestartet; dafür waren keine App-Codeänderungen nötig. Ausführliche neue Protokolle heißen `resume-*.log`.
+
+Künftige NOCT-Aufträge sichern umfangreiche Änderungen vorab und pushen größere überprüfte Fortschritte zeitnah auf den zugewiesenen Entwicklungsbranch. Bei drohender Unterbrechung sind nachvollziehbar dokumentierte WIP-Commits vorgesehen. Dies ist eine verbindliche Arbeitsregel für Coding-Agenten, kein zusätzlich aktivierter Hintergrunddienst oder GitHub-Actions-Autopilot.

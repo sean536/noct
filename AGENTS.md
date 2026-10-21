@@ -11,8 +11,6 @@ Bestehende Next.js-/React-/TypeScript-/MapLibre-App weiterentwickeln. Keine Neue
 - Vor dem Bearbeiten den aktiven Branch prüfen. Bei einem unpassenden Branch zuerst auf dem zugewiesenen Branch arbeiten; fremde oder uncommittete Änderungen nicht überschreiben.
 - Änderungen an gemeinsam genutzten Dateien vorher abstimmen. Die UI und Geschäftslogik teilen sich insbesondere `app/page.tsx` und `components/CityMap.tsx`; Branches allein verhindern dort keine späteren Konflikte.
 
-## Qualität und Grenzen
-
 ## Verbindliche GitHub-Checkpoints
 
 - Vor umfangreichen Änderungen den funktionierenden Ausgangsstand mit einem Git-Checkpoint sichern. Den aktiven Entwicklungsbranch und vorhandene Änderungen zuerst prüfen; fremde Arbeit nicht überschreiben.
