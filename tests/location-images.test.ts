@@ -17,10 +17,11 @@ test('supplied photos belong to four stable locations and are disabled outside t
  for(const location of locationImages){
   const photo=locationImageFor(location.venue,true)!;
   assert.equal(photo.id,location.id);
-  assert.equal(photo.srcSet.split(', ').length,3);
+  assert.equal(photo.srcSet.split(', ').length,4);
   assert.match(photo.src,/^\/_private\/club-photos\//);
  }
  assert.deepEqual(events.filter(event=>locationImageFor(event.venue,true)).map(event=>event.id),['soft-sunset']);
+ assert.match(locationImageFor('Weekend Club',true)!.srcSet,/weekend-club-1280\.webp 1280w/);
 });
 
 test('ordinary build and venues without supplied photographs retain neutral cards and existing controls',()=>{

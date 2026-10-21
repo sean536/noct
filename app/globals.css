@@ -154,12 +154,12 @@ button,a,input{touch-action:manipulation}button svg{flex-shrink:0}a{color:inheri
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 /* Supplied venue photographs: opt-in owner-private demo, scoped to matching event cards. */
-.card.photo-card{position:relative;display:block;aspect-ratio:4/5;min-width:0;padding:0;overflow:hidden;border-radius:24px;background:#1c1c1e;color:#fff;isolation:isolate;animation:in .45s var(--ease)}
+.card.photo-card{position:relative;display:block;aspect-ratio:4/5;min-width:0;max-width:440px;margin-inline:auto;padding:0;overflow:hidden;border-radius:24px;background:#1c1c1e;color:#fff;isolation:isolate;animation:in .45s var(--ease)}
 .photo-card .card-open{position:absolute;inset:0;display:block;width:100%;height:100%;border-radius:inherit;color:inherit;overflow:hidden}
 .photo-card .club-photo{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
 .photo-card .card-body{position:absolute;inset:auto 0 0;display:flex;flex-direction:column;gap:8px;width:100%;padding:58px 20px 20px;background:linear-gradient(transparent,rgba(0,0,0,.68) 26%,rgba(0,0,0,.88));color:#fff;text-align:left}
 .photo-card .photo-venue{font-size:24px;font-weight:650;line-height:1.08;letter-spacing:-.025em;overflow-wrap:anywhere}
-.photo-card .card-title{font-size:17px;font-weight:550;line-height:1.3;letter-spacing:-.01em;color:#fff;overflow-wrap:anywhere}
+.photo-card .card-title{font-size:17px;font-weight:550;line-height:1.3;letter-spacing:-.01em;color:#fff;white-space:normal;overflow-wrap:anywhere}
 .photo-card .sub,.photo-card .meta{font-size:13px;font-weight:500;line-height:1.4;color:#fff}
 .photo-card .meta{gap:6px 10px;align-items:center}.photo-card .meta>span:first-child{font-size:12px;white-space:normal}
 .photo-card .tag{padding:0;background:none;color:#fff;font-size:13px;line-height:1.4}

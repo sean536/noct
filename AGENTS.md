@@ -20,6 +20,10 @@ Bestehende Next.js-/React-/TypeScript-/MapLibre-App weiterentwickeln. Keine Neue
 - Push-Erfolg und Remote-Commit prüfen. Bei fehlendem Zugriff oder Konflikten die lokale Sicherung erhalten und den konkreten Blocker melden. Keine Force-Pushes, unkontrollierten Pushes auf `main` oder automatischen Merges.
 - Keine Secrets, echten `.env`-Dateien oder Build-Artefakte einchecken. Keine zusätzlichen Entwicklungswebsites erstellen; ausschließlich die ausdrücklich beauftragte bestehende Entwicklungswebsite aktualisieren.
 
+## Persönliche Clubfoto-Demo
+
+Das GitHub-Repository ist öffentlich. Die vier bereitgestellten Clubfotos und sämtliche Derivate bleiben außerhalb des Repositories; nicht auf GitHub einchecken oder auf öffentlichen Websites bereitstellen. Nur der Code und die Bildzuordnung dürfen gepusht werden. Für die Fotovariante muss die bestehende Entwicklungswebsite nachweislich owner-private bleiben, einschließlich statischer Bilddateien. Den Zugriff vor jedem Foto-Upload erneut prüfen; nie diese Version öffentlich schalten. Standardbuilds aktivieren die Fotos nicht. Siehe `docs/ui/private-location-photos.md`.
+
 ## Prüfung und Projektgrenzen
 
 `npm ci`, `npm test`, `npm run typecheck`, `npm run build` sind die vorhandenen Standardbefehle. Tests müssen aussagekräftig sein; Tests und Build belegen keine echte GPU- oder iPhone-Leistung.

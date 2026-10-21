@@ -11,7 +11,7 @@ export default function EventCard({event,saved,onOpen,onSave}:{event:NightEvent;
  const photo=candidate?.src!==failedSource?candidate:undefined;
  return <article className={`card${photo?' photo-card':''}`} aria-label={`Demo-Event ${event.name}`}>
   <button className="card-open" aria-label={`${event.name}: Event ansehen`} onClick={()=>onOpen(event)}>
-   {photo?<><img className="club-photo" src={photo.src} srcSet={photo.srcSet} sizes="(min-width: 900px) 356px, (max-width: 360px) calc(100vw - 48px), min(440px, calc(100vw - 48px))" width={photo.width} height={photo.height} style={{objectPosition:photo.position}} alt={photo.alt} loading="lazy" decoding="async" onError={()=>setFailedSource(photo.src)}/><span className="photo-status">Demo-Event</span></>:<Poster event={event}/>}
+   {photo?<><img className="club-photo" src={photo.src} srcSet={photo.srcSet} sizes={photo.sizes} width={photo.width} height={photo.height} style={{objectPosition:photo.position}} alt={photo.alt} loading="lazy" decoding="async" onError={()=>setFailedSource(photo.src)}/><span className="photo-status">Demo-Event</span></>:<Poster event={event}/>}
    <span className="card-body">{photo&&<span className="photo-venue">{event.venue}</span>}<strong className="card-title">{event.name}</strong>
     {!photo&&<span className="sub">{event.venue} · {event.district}</span>}
     <span className="sub">{dateLabel(event.date)} · {event.time} Uhr</span>
