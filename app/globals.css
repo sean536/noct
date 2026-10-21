@@ -152,3 +152,19 @@ button,a,input{touch-action:manipulation}button svg{flex-shrink:0}a{color:inheri
 @keyframes sheet-enter{from{opacity:0;translate:0 32px}to{opacity:1;translate:0 0}}
 @media(min-width:900px){@keyframes sheet-enter{from{opacity:0;translate:24px 0}to{opacity:1;translate:0 0}}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Supplied venue photographs: opt-in owner-private demo, scoped to matching event cards. */
+.card.photo-card{position:relative;display:block;aspect-ratio:4/5;min-width:0;padding:0;overflow:hidden;border-radius:24px;background:#1c1c1e;color:#fff;isolation:isolate;animation:in .45s var(--ease)}
+.photo-card .card-open{position:absolute;inset:0;display:block;width:100%;height:100%;border-radius:inherit;color:inherit;overflow:hidden}
+.photo-card .club-photo{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover}
+.photo-card .card-body{position:absolute;inset:auto 0 0;display:flex;flex-direction:column;gap:8px;width:100%;padding:58px 20px 20px;background:linear-gradient(transparent,rgba(0,0,0,.68) 26%,rgba(0,0,0,.88));color:#fff;text-align:left}
+.photo-card .photo-venue{font-size:24px;font-weight:650;line-height:1.08;letter-spacing:-.025em;overflow-wrap:anywhere}
+.photo-card .card-title{font-size:17px;font-weight:550;line-height:1.3;letter-spacing:-.01em;color:#fff;overflow-wrap:anywhere}
+.photo-card .sub,.photo-card .meta{font-size:13px;font-weight:500;line-height:1.4;color:#fff}
+.photo-card .meta{gap:6px 10px;align-items:center}.photo-card .meta>span:first-child{font-size:12px;white-space:normal}
+.photo-card .tag{padding:0;background:none;color:#fff;font-size:13px;line-height:1.4}
+.photo-card .photo-status{position:absolute;top:16px;left:16px;padding:5px 9px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:550;line-height:1.4}
+.card.photo-card .heart{position:absolute;top:12px;right:12px;z-index:2;align-self:auto;width:44px;height:44px;color:#fff;background:rgba(0,0,0,.62)}
+.photo-card .heart:active{transform:scale(.94)}.photo-card .heart[aria-pressed=true]{color:#fff}
+.photo-card .card-open:focus-visible{outline:3px solid #fff;outline-offset:-6px}.photo-card .heart:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 6px #1c1c1e}
+@media(max-width:360px){.photo-card .card-body{padding-right:16px;padding-left:16px;padding-bottom:16px}.photo-card .photo-venue{font-size:22px}}
