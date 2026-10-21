@@ -13,6 +13,17 @@ Bestehende Next.js-/React-/TypeScript-/MapLibre-App weiterentwickeln. Keine Neue
 
 ## Qualität und Grenzen
 
+## Verbindliche GitHub-Checkpoints
+
+- Vor umfangreichen Änderungen den funktionierenden Ausgangsstand mit einem Git-Checkpoint sichern. Den aktiven Entwicklungsbranch und vorhandene Änderungen zuerst prüfen; fremde Arbeit nicht überschreiben.
+- Nach jedem größeren abgeschlossenen und überprüften Arbeitsschritt automatisch einen aussagekräftig benannten Commit erstellen und auf den zugewiesenen Entwicklungsbranch pushen. Beispiele: UI-Komponenten integriert, Chat/Eventdetails verbunden, mobile Fehler behoben, Prüfungen erfolgreich, finale Integration abgeschlossen.
+- Den ersten Push nicht bis zum Ende eines langen Auftrags aufschieben. Bei Wiederaufnahme zuerst den erhaltenen Workspace, Diff, ungetrackte Dateien und vorhandene Checkpoints prüfen; keine bereits erledigte Entwicklung wiederholen.
+- Bei absehbarer Unterbrechung den nachvollziehbaren Stand möglichst frühzeitig sichern. Unfertige Zwischenstände dürfen sicher und ausdrücklich als `WIP` gekennzeichnet auf den Entwicklungsbranch gepusht werden. Offene Fehler und tatsächlich ausgeführte Prüfungen dokumentieren; einen WIP-Checkpoint nicht als fertige Freigabe ausgeben.
+- Push-Erfolg und Remote-Commit prüfen. Bei fehlendem Zugriff oder Konflikten die lokale Sicherung erhalten und den konkreten Blocker melden. Keine Force-Pushes, unkontrollierten Pushes auf `main` oder automatischen Merges.
+- Keine Secrets, echten `.env`-Dateien oder Build-Artefakte einchecken. Keine zusätzlichen Entwicklungswebsites erstellen; ausschließlich die ausdrücklich beauftragte bestehende Entwicklungswebsite aktualisieren.
+
+## Prüfung und Projektgrenzen
+
 `npm ci`, `npm test`, `npm run typecheck`, `npm run build` sind die vorhandenen Standardbefehle. Tests müssen aussagekräftig sein; Tests und Build belegen keine echte GPU- oder iPhone-Leistung.
 
 Keine Secrets, echten `.env`-Dateien, `node_modules`, `.next` oder `out` einchecken. Neue kostenpflichtige Dienste nur nach Zustimmung. Die Standardkarte benötigt keinen API-Key. Details: `CONFIGURATION.md`.
