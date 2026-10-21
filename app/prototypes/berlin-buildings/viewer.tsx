@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import maplibregl,{type Map as GLMap} from 'maplibre-gl';
-import {events} from '@/lib/events';import {imageryConfig} from '@/lib/imagery';import {BUILDING_LAYER,BUILDING_SOURCE,CITY_LIGHT} from '@/lib/buildings';
+import {locationStops as events} from '@/lib/locations';import {imageryConfig} from '@/lib/imagery';import {BUILDING_LAYER,BUILDING_SOURCE,CITY_LIGHT} from '@/lib/buildings';
 import {validateManifest,type BuildingManifest} from '@/prototypes/buildings/contract';
 import {inspectGlb,MOBILE_BUDGET,DESKTOP_BUDGET,type GlbReport} from '@/prototypes/buildings/glb';
 import {AssetSession} from '@/prototypes/buildings/session';
@@ -10,7 +10,7 @@ import styles from './viewer.module.css';
 
 type Stats=GlbReport&{decodeMs:number;geometryBytes:number;firstDrawMs?:number;calls?:number;renderHz?:number};
 const mib=(bytes:number)=>(bytes/1024/1024).toFixed(1)+' MiB';
-const defaultEvent=events.find(e=>e.id==='afterhours')!;
+const defaultEvent=events.find(e=>e.id==='location:weekend-club')!;
 export default function BuildingLab(){
  const container=useRef<HTMLDivElement>(null),map=useRef<GLMap|null>(null),markerRef=useRef<maplibregl.Marker|null>(null),session=useRef(new AssetSession<BuildingModelLayer>()),layer=useRef<BuildingModelLayer|null>(null),revision=useRef(0);
  const [eventId,setEventId]=useState(defaultEvent.id),[ready,setReady]=useState(false),[busy,setBusy]=useState(false),[mapProblem,setMapProblem]=useState(''),[message,setMessage]=useState('Kein Berliner Mesh enthalten. Aktuell siehst du den bestehenden OSM-Fallback.'),[glb,setGlb]=useState<File|null>(null),[json,setJson]=useState<File|null>(null),[manifest,setManifest]=useState<BuildingManifest|null>(null),[stats,setStats]=useState<Stats|null>(null),[mobile,setMobile]=useState(true),[modelVisible,setModelVisible]=useState(false);
@@ -67,7 +67,7 @@ export default function BuildingLab(){
   <section className={styles.panel} aria-label="Gebäude-Prototyp">
    <h1>NOCT · Gebäude-Labor</h1><p>Technischer Import-Prototyp. Die NOCT-Hauptkarte bleibt unverändert.</p>
    <p className={styles.notice}>Das offizielle Mesh-Portal ist in Wartung. Es sind keine echten Berliner Mesh-Dateien enthalten. Kein Fotorealismus-Nachweis.</p>
-   <label>Eventgebiet<select value={eventId} onChange={e=>{removeModel();setEventId(e.target.value);setMessage('OSM-Fallback aktiv. Passendes Modell für dieses Eventgebiet wählen.');fly(e.target.value);}}>{events.map(e=><option key={e.id} value={e.id}>{e.venue} · {e.district}</option>)}</select></label>
+   <label>Locationgebiet<select value={eventId} onChange={e=>{removeModel();setEventId(e.target.value);setMessage('OSM-Fallback aktiv. Passendes Modell für dieses Locationgebiet wählen.');fly(e.target.value);}}>{events.map(e=><option key={e.id} value={e.id}>{e.venue} · {e.district}</option>)}</select></label>
    <label>Lokales, eingebettetes GLB<input type="file" accept=".glb" onChange={e=>setGlb(e.target.files?.[0]??null)}/></label>
    <label>Georeferenz- und Quellenmanifest<input type="file" accept=".json,application/json" onChange={e=>setJson(e.target.files?.[0]??null)}/></label>
    <div className={styles.actions}><button onClick={load} disabled={!glb||!json||!ready||busy}>{busy?'Wird geprüft …':'Lokal prüfen & laden'}</button><button onClick={removeModel} disabled={!busy&&!manifest}>Import entfernen</button></div>

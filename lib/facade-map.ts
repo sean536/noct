@@ -3,7 +3,7 @@ import {FacadeTileLayer} from './facade-tile-layer';
 import {tileKey,type CityTile,type TileMesh} from './facade-tile';
 import {tileFor} from './tile-prefetch';
 import type {NearFacadeDetails} from './facade-near';
-import {events} from './events';
+import {locations} from './locations';
 import {FACADE_WORKER_URL} from './facade-worker-entry.generated';
 import {installFacadeMaterials} from './facade-materials';
 
@@ -44,7 +44,7 @@ export class FacadeMap {
   // A tiny, bounded event-area warm set, using the same provider and ordinary HTTP cache.
   // Existing camera plans and source prefetching remain untouched.
   if(!this.warmed&&this.map.getZoom()>=13.5){
-   this.warmed=true;for(const e of events){const t=tileFor(e.coords,Math.min(14,source.maxzoom));this.warmTiles.push(t);}
+   this.warmed=true;for(const e of locations){const t=tileFor(e.coords,Math.min(14,source.maxzoom));this.warmTiles.push(t);}
   }
   wanted.push(...this.warmTiles);const wantedKeys=new Set(wanted.map(tileKey));for(const [key,p] of this.pending)if(p.stage==='fetch'&&!wantedKeys.has(key))p.abort.abort();
   const queued=new Set<string>();this.queue=wanted.filter(t=>{const k=tileKey(t);if(queued.has(k)||this.layer.has(k)||this.pending.has(k)||Date.now()-(this.failures.get(k)??-Infinity)<10000)return false;queued.add(k);return true;});

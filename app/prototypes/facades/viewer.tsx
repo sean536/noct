@@ -3,12 +3,12 @@ import {useEffect,useRef,useState} from 'react';
 import maplibregl,{type Map as GLMap} from 'maplibre-gl';
 import {BUILDING_LAYER,BUILDING_SOURCE,CITY_LIGHT} from '@/lib/buildings';
 import {imageryConfig} from '@/lib/imagery';
-import {events} from '@/lib/events';
+import {locationStops as events} from '@/lib/locations';
 import {fixtureBuildings,selectBuildings,facadeLod,localPoint,type BuildingFeature,type FacadeBuilding,type Point} from '@/prototypes/facades/data';
 import type {FacadeLayer} from '@/prototypes/facades/layer';
 import styles from './viewer.module.css';
 
-const start=events.find(e=>e.id==='afro')!;
+const start=events.find(e=>e.id==='location:weekend-club')!;
 const comparisonSource='lab-comparison-footprints',comparisonLayer='lab-comparison-extrusions';
 type Metrics=ReturnType<FacadeLayer['stats']>;
 type Measurement={mode:'before'|'after';frames:number;renderHz:number;p95Ms:number;cpuMs:number;calls:number;geometryKiB:number;heapMiB:number|null};
@@ -114,7 +114,7 @@ export default function FacadeViewer(){
    <h1>NOCT · Fassaden-Labor</h1><p>Isolierter Prototyp für bis zu 16 Gebäude. Die Hauptkarte bleibt unverändert.</p>
    <p className={styles.notice}>Fenster, Farben und Balkone sind deterministisch erzeugte Interpretationen. Keine fotografisch erfassten Berliner Fassaden.</p>
    <label>Datenquelle<select value={source} onChange={e=>{location.href=e.target.value==='fixture'?'/prototypes/facades/?fixture=1':'/prototypes/facades/';}}><option value="live">Live · bestehende OpenFreeMap-Quelle</option><option value="fixture">Offline-Prüfszene · synthetisch</option></select></label>
-   {source==='live'&&<label>Vorhandenes Eventgebiet<select value={eventId} onChange={e=>{const event=events.find(v=>v.id===e.target.value)!;cancelBench();remove();setEventId(event.id);origin.current=event.coords;map.current?.stop();map.current?.easeTo({center:event.coords,zoom:17.35,pitch:60,duration:reduced.current?0:1600});setStatus('Neues Gebiet lädt. Danach Gebäude erfassen.');}}>{events.map(e=><option key={e.id} value={e.id}>{e.venue} · {e.district}</option>)}</select></label>}
+   {source==='live'&&<label>Vorhandene Location<select value={eventId} onChange={e=>{const event=events.find(v=>v.id===e.target.value)!;cancelBench();remove();setEventId(event.id);origin.current=event.coords;map.current?.stop();map.current?.easeTo({center:event.coords,zoom:17.35,pitch:60,duration:reduced.current?0:1600});setStatus('Neues Gebiet lädt. Danach Gebäude erfassen.');}}>{events.map(e=><option key={e.id} value={e.id}>{e.venue} · {e.district}</option>)}</select></label>}
    <div className={styles.actions}><button disabled={!ready||busy||source==='fixture'} onClick={()=>void build()}>Gebäude erfassen</button><button disabled={!metrics} aria-pressed={!shown} onClick={()=>show(false)}>Vorher · OSM</button><button disabled={!metrics} aria-pressed={shown} onClick={()=>show(true)}>Nachher · Fassaden</button></div>
    <div className={styles.actions}><button disabled={!ready} onClick={fly}>Schräger Testflug</button><button aria-pressed={night} onClick={()=>{cancelBench();nightRef.current=!night;setNight(!night);layer.current?.setNight(!night);}}>Fenster: {night?'Nacht':'Tag'}</button></div>
    <div className={styles.actions}><button disabled={!metrics||reducedMotion} onClick={()=>measure('before')}>Vorher messen</button><button disabled={!metrics||reducedMotion} onClick={()=>measure('after')}>Nachher messen</button></div>

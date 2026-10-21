@@ -4,7 +4,7 @@ export const locationImageWidthsFor=(originalWidth:number)=>[...locationImageWid
 export const locationImages=[
  {id:'808-nachtklub',venue:'808 Nachtklub',aliases:['808 Nachtklub'],attachment:1,width:1280,height:720,position:'50% 50%'},
  {id:'bricks-club',venue:'BRICKS Club',aliases:['BRICKS Club'],attachment:2,width:1023,height:1280,position:'50% 50%'},
- {id:'amano-rooftop',venue:'AMANO Rooftop Bar am Berliner Hauptbahnhof',aliases:['AMANO Rooftop Bar am Berliner Hauptbahnhof','AMANO Rooftop Bar Hauptbahnhof'],attachment:3,width:1147,height:633,position:'45% 50%'},
+ {id:'amano-rooftop',venue:'AMANO Rooftop Bar am Berliner Hauptbahnhof',aliases:['AMANO Rooftop Bar am Berliner Hauptbahnhof','AMANO Rooftop Bar Hauptbahnhof','AMANO Rooftop am Berliner Hauptbahnhof'],attachment:3,width:1147,height:633,position:'45% 50%'},
  {id:'weekend-club',venue:'Weekend Club',aliases:['Weekend Club'],attachment:4,width:1280,height:851,position:'32% 50%'}
 ] as const;
 export const locationImageFilename=(id:string,width:number)=>`${id}-${width}.webp`;

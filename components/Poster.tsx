@@ -1,2 +1,9 @@
+'use client';
 import type {NightEvent} from '@/lib/events';
-export default function Poster({event,large=false}:{event:NightEvent;large?:boolean}){return <div className={`art art-${event.art} ${large?'poster-large':''}`} aria-label={`Illustratives Demo-Artwork für ${event.name}`} role="img"/>}
+import {locationImageFor} from '@/lib/location-images';
+import {useState} from 'react';
+export default function Poster({event,large=false}:{event:Pick<NightEvent,'venue'>;large?:boolean}){
+ const photo=locationImageFor(event.venue),[failed,setFailed]=useState(false);
+ if(photo&&!failed)return <img className={`art${large?' poster-large':''}`} src={photo.src} srcSet={photo.srcSet} sizes={photo.sizes} width={photo.width} height={photo.height} alt={photo.alt} style={{objectFit:'cover',objectPosition:photo.position}} onError={()=>setFailed(true)}/>;
+ return <div className={`art${large?' poster-large':''}`} aria-label={`Kein Foto für ${event.venue} verfügbar`} role="img"/>;
+}
