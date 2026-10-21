@@ -22,3 +22,15 @@ Standardbuilds aktivieren keine Fotos. Die private Variante wird explizit mit `N
 `srcset`, `sizes`, Lazy Loading und asynchrones Decoding reduzieren den Bildtransfer. `sizes` berücksichtigt die breitere Bildfläche eines Landschaftsfotos beim 4:5-Cover-Ausschnitt und wählt auf Retina-Geräten bis zur Originalauflösung. CSS schneidet das Motiv passend auf 4:5 zu, verzerrt es aber nicht. Karten bleiben maximal 440px breit. Fehler beim Bildladen stellen die bisherige neutrale Karte wieder her; Favoriten und bestehende Eventdetails bleiben bedienbar. Andere Locations bekommen keine unpassenden Fotos. Die zusätzlichen Regeln sind auf `.photo-card` begrenzt.
 
 `out/` bleibt ignoriert. Ein späterer öffentlicher Deploy muss einen sauberen Standardbuild ohne Foto-Flag und ohne private Bilddateien verwenden. Ein Wechsel der Entwicklungswebsite zurück zu öffentlich ist mit dieser Foto-Version ausdrücklich nicht erlaubt.
+
+## Tatsächliche Prüfung
+
+98 Tests, TypeScript und beide Produktionsvarianten (Standard und private Fotovariante) bestanden. Der Standardexport wurde anschließend auf null private Bilddateien geprüft. Alle 28 geschützten Karten-/Fassaden-/Dach-/Licht-/Tour-/Chat-/Filter-/Event-/Detaildateien stimmen mit dem freigegebenen Phase-3-Stand überein.
+
+Die vollständige Root-App wurde in Chromium bei 1365×900, 390×844 mit Touch/DPR2, 320×568 und 768×1024 geprüft: 26 bestandene Verhaltensgruppen für Originalfoto, 4:5 ohne Verzerrung, Demo-/Preiskennzeichnung, Eventdetails, Favoriten samt Persistenz und Entfernen, bestehende Filter, Maus-/Touch-Karte und Bildfehler-Fallback. Separate Reduced-Motion-/Tastaturprüfung bestanden. Gemessener minimaler Weißtextkontrast über den gerenderten Bild-/Verlaufsflächen: 10,59:1 Desktop und 10,11:1 Mobil. Auf sehr kleinen Ansichten bleiben hohe Fotokarten innerhalb des vorhandenen Sheets scrollbar.
+
+Der Browser wählte nach der Korrektur 960px am Desktop und 1280px für Weekend auf mobilen Retina-Ansichten. Die 640px-Varianten der vier Fotos sind 38–57KB groß; Weekend benötigt 78KB in 960px beziehungsweise 118KB in voller 1280px-Auflösung. Das ist keine Aussage über reale mobile Netzladezeiten oder Bildrate.
+
+Der Pfadschutz wurde vor der Korrektur mit leeren Eingabeordnern für `..`-Präfix und Symlink reproduziert und danach mit identischem CLI-Test bestanden. Kein echtes Foto gelangte dabei in das Repository. Die Bildauswahl wurde vor der Korrektur als zu kleine Cover-Quelle reproduziert. Frühere Fehler in Browser-Testannahmen (zusätzliche SVG-Bildrolle und gecachtes Bild beim simulierten 404) wurden getrennt protokolliert.
+
+Physischer iPhone-Safari-Test und reale Providerverfügbarkeit bleiben offen. Die Browserprüfung verwendet echte Berliner Grundrisse/-höhen als MVT-Replay und ein neutrales QA-Raster; die unveränderte App nutzt weiterhin ihre bisherigen Live-Kartenquellen. Evidenz, Screenshots und Bildprovenienz liegen außerhalb des öffentlichen Repositories unter `/workspace/work/noct-phase4-private/`.
