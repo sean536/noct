@@ -1,74 +1,80 @@
-import type {CustomLayerInterface,Map as GLMap,MapSourceDataEvent} from 'maplibre-gl';
-import {FacadeLayer} from '../prototypes/facades/layer';
-import {selectBuildings,facadeLod,localPoint,type BuildingFeature,type FacadeBuilding,type Point} from '../prototypes/facades/data';
+import type {Map as GLMap,MapSourceDataEvent,VectorTileSource} from 'maplibre-gl';
+import {FacadeTileLayer} from './facade-tile-layer';
+import {tileKey,type CityTile,type TileMesh} from './facade-tile';
+import {tileFor} from './tile-prefetch';
+import type {NearFacadeDetails} from './facade-near';
+import {events} from './events';
+import {FACADE_WORKER_URL} from './facade-worker-entry.generated';
+import {installFacadeMaterials} from './facade-materials';
 
-export interface FacadeRenderer extends CustomLayerInterface {
- readonly buildings:FacadeBuilding[];readonly origin:Point;
- prepare():void;updateBuildings(buildings:FacadeBuilding[],origin:Point):void;
- setShown(shown:boolean):void;dispose():void;onFailure?:(error:Error)=>void;
-}
-interface Options {
- mobile:boolean;limit?:number;
- createLayer?:(buildings:FacadeBuilding[],origin:Point)=>FacadeRenderer;
- hidden?:()=>boolean;
-}
-function signature(buildings:FacadeBuilding[]){
- return JSON.stringify(buildings.map(b=>[b.id,b.geometry,b.height,b.material,b.roof,b.roofHeight,b.residential,b.commercial,b.industrial]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
-}
-
-/** One bounded renderer for the live map. Never moves the camera or creates another tile source. */
+interface WorkerLike {postMessage:(value:unknown,transfer:Transferable[])=>void;terminate:()=>void;onmessage:((event:MessageEvent)=>void)|null;onerror:((event:ErrorEvent)=>void)|null}
+interface Options {mobile:boolean;worker?:()=>WorkerLike;request?:typeof fetch}
+interface Pending {tile:CityTile;abort:AbortController;id:number;stage:'fetch'|'mesh';timer?:ReturnType<typeof setTimeout>}
+/** Complete visible native tiles; geometry/material preparation is independent of camera timing. */
 export class FacadeMap {
- private renderer?:FacadeRenderer;private timer?:ReturnType<typeof setTimeout>;
- private disposed=false;private currentSignature='';private displayed=false;
- private readonly hidden:()=>boolean;private readonly createLayer:NonNullable<Options['createLayer']>;
+ private readonly layer:FacadeTileLayer;private worker?:WorkerLike;private request:typeof fetch;private disposed=false;
+ private near?:NearFacadeDetails;private nearLoading=false;
+ private active:CityTile[]=[];private queue:CityTile[]=[];private pending=new Map<string,Pending>();private ids=new Map<number,string>();
+ private warmTiles:CityTile[]=[];
+ private failures=new Map<string,number>();private counter=0;private template='';private warmed=false;private hidden=false;
  constructor(private readonly map:GLMap,private readonly options:Options){
-  this.hidden=options.hidden??(()=>typeof document!=='undefined'&&document.hidden);
-  this.createLayer=options.createLayer??((buildings,origin)=>new FacadeLayer(buildings,origin,options.mobile,{id:'noct-procedural-facades',balconyZoom:16.5,surfaceOverlay:true}));
-  map.on('move',this.moved);map.on('sourcedata',this.sourceData);map.on('webglcontextlost',this.lost);
+  this.hidden=typeof document!=='undefined'&&document.hidden;this.layer=new FacadeTileLayer(options.mobile);this.request=options.request??fetch.bind(globalThis);
+  installFacadeMaterials(map);
+  this.layer.onFailure=()=>queueMicrotask(()=>this.destroy());map.addLayer(this.layer);
+  try{
+   this.worker=options.worker?.()??new Worker(FACADE_WORKER_URL,{type:'module'});
+   this.worker.onmessage=this.completed;this.worker.onerror=()=>this.destroy();
+  }catch{this.destroy();return;}
+  map.on('move',this.refresh);map.on('sourcedata',this.sourceData);map.on('webglcontextlost',this.lost);
   if(typeof document!=='undefined')document.addEventListener('visibilitychange',this.visibility);
-  this.schedule(0);
+  this.refresh();
  }
- private sourceData=(event:MapSourceDataEvent)=>{if(event.sourceId==='buildings')this.schedule();};
- private moved=()=>{this.syncVisibility();this.schedule();};
- private visibility=()=>{this.syncVisibility();if(this.hidden())this.cancel();else this.schedule(0);};
+ private sourceData=(event:MapSourceDataEvent)=>{if(event.sourceId==='buildings')this.refresh();};
  private lost=()=>this.destroy();
- private cancel(){if(this.timer!==undefined)clearTimeout(this.timer);this.timer=undefined;}
- private schedule(delay=750){if(this.disposed||this.hidden()||this.timer!==undefined)return;this.timer=setTimeout(()=>{this.timer=undefined;this.refresh();},delay);}
- private syncVisibility(){
-  if(!this.renderer||this.disposed)return;
-  const c=this.map.getCenter(),distance=Math.hypot(...localPoint([c.lng,c.lat],this.renderer.origin));
-  const enabled=!this.hidden()&&this.map.getZoom()>=15.4&&facadeLod(this.map.getZoom(),distance).visible;
-  if(enabled===this.displayed)return;
-  try{
-   this.renderer.setShown(enabled);this.displayed=enabled;
-  }catch{this.destroy();}
+ private visibility=()=>{this.hidden=typeof document!=='undefined'&&document.hidden;if(this.hidden){for(const p of this.pending.values())p.abort.abort();this.queue=[];}else this.refresh();};
+ private source(){return this.map.getSource('buildings') as VectorTileSource|undefined;}
+ private refresh=()=>{
+  if(this.disposed||this.hidden)return;const source=this.source();if(!source?.tiles?.[0])return;
+  this.template=source.tiles[0];const zoom=Math.min(source.maxzoom,Math.max(14,Math.floor(this.map.getZoom())));
+  // This matches the provider's first building-height zoom, not a facade detail cutoff.
+  this.active=this.map.getZoom()<13.5?[]:this.map.coveringTiles({tileSize:source.tileSize||512,minzoom:zoom,maxzoom:zoom}).map(t=>t.canonical);
+  this.layer.setActive(this.active);
+  if(this.map.getZoom()>=16.5&&!this.near&&!this.nearLoading){this.nearLoading=true;void import('./facade-near').then(({NearFacadeDetails})=>{if(!this.disposed)this.near=new NearFacadeDetails(this.map,this.options.mobile);}).catch(()=>{});}
+  const wanted=[...this.active];
+  // A tiny, bounded event-area warm set, using the same provider and ordinary HTTP cache.
+  // Existing camera plans and source prefetching remain untouched.
+  if(!this.warmed&&this.map.getZoom()>=13.5){
+   this.warmed=true;for(const e of events){const t=tileFor(e.coords,Math.min(14,source.maxzoom));this.warmTiles.push(t);}
+  }
+  wanted.push(...this.warmTiles);const wantedKeys=new Set(wanted.map(tileKey));for(const [key,p] of this.pending)if(p.stage==='fetch'&&!wantedKeys.has(key))p.abort.abort();
+  const queued=new Set<string>();this.queue=wanted.filter(t=>{const k=tileKey(t);if(queued.has(k)||this.layer.has(k)||this.pending.has(k)||Date.now()-(this.failures.get(k)??-Infinity)<10000)return false;queued.add(k);return true;});
+  this.pump();
+ };
+ private pump(){
+  if(this.disposed||this.hidden||!this.worker)return;
+  while(this.pending.size<2&&this.queue.length){
+   const tile=this.queue.shift()!,key=tileKey(tile),abort=new AbortController(),id=++this.counter;
+   const url=this.template.replaceAll('{z}',String(tile.z)).replaceAll('{x}',String(tile.x)).replaceAll('{y}',String(tile.y));
+   if(/[{}]/.test(url))continue;
+   const pending:Pending={tile,abort,id,stage:'fetch'};this.pending.set(key,pending);this.ids.set(id,key);
+   const timeout=setTimeout(()=>abort.abort(),6000);pending.timer=timeout;
+   const priority=this.active.some(t=>tileKey(t)===key)?'high':'low';
+   void this.request(url,{signal:abort.signal,cache:'default',mode:'cors',credentials:'omit',priority})
+    .then(async response=>{if(!response.ok)throw Error('Tile unavailable');const bytes=await response.arrayBuffer();if(this.disposed||abort.signal.aborted)throw Error('Tile cancelled');clearTimeout(timeout);pending.stage='mesh';pending.timer=setTimeout(()=>this.destroy(),10000);this.worker!.postMessage({id,bytes,tile},[bytes]);})
+    .catch(()=>{clearTimeout(timeout);this.pending.delete(key);this.ids.delete(id);this.failures.set(key,Date.now());this.trimFailures();this.pump();});
+  }
  }
- private refresh(){
-  if(this.disposed||this.hidden()||this.map.getZoom()<15.4||!this.map.getLayer('real-buildings')||!this.map.getSource('buildings'))return;
-  try{
-   const center=this.map.getCenter(),origin:Point=[center.lng,center.lat];
-   const input=this.map.querySourceFeatures('buildings',{sourceLayer:'building'}) as BuildingFeature[];
-   const buildings=selectBuildings(input,origin,this.options.limit??(this.options.mobile?12:20),{surfaceOverlay:true}).buildings;
-   if(!buildings.length){this.renderer?.setShown(false);this.displayed=false;return;}
-   const next=signature(buildings);
-   if(next===this.currentSignature){this.syncVisibility();return;}
-   if(!this.renderer){
-    const layer=this.createLayer(buildings,origin);this.renderer=layer;
-    layer.setShown(false);
-    layer.onFailure=()=>queueMicrotask(()=>{if(!this.disposed)this.destroy();});
-    this.map.addLayer(layer);layer.prepare();
-   }else this.renderer.updateBuildings(buildings,origin);
-   // Never hide a vector feature: one ID may include hundreds of unselected
-   // buildings. Prepared, depth-biased wall surfaces cover only selected parts.
-   this.renderer.setShown(true);this.displayed=true;this.currentSignature=next;
-  }catch{this.destroy();}
- }
+ private completed=(event:MessageEvent)=>{
+  const {id,mesh,error}=event.data as {id:number;mesh?:TileMesh;error?:string};const key=this.ids.get(id);if(!key||this.disposed)return;
+  this.ids.delete(id);clearTimeout(this.pending.get(key)?.timer);this.pending.delete(key);
+  if(mesh&&!error){this.layer.add(mesh);this.failures.delete(key);}else this.failures.set(key,Date.now());this.trimFailures();this.pump();
+ };
+ private trimFailures(){while(this.failures.size>256)this.failures.delete(this.failures.keys().next().value!);}
+ stats(){return {...this.layer.stats(),pending:this.pending.size,queued:this.queue.length,failedTiles:this.failures.size};}
  destroy(){
-  if(this.disposed)return;this.disposed=true;this.cancel();
-  this.map.off('move',this.moved);this.map.off('sourcedata',this.sourceData);this.map.off('webglcontextlost',this.lost);
+  if(this.disposed)return;this.disposed=true;this.map.off('move',this.refresh);this.map.off('sourcedata',this.sourceData);this.map.off('webglcontextlost',this.lost);
   if(typeof document!=='undefined')document.removeEventListener('visibilitychange',this.visibility);
-  let removed=false;
-  try{if(this.renderer&&this.map.getLayer(this.renderer.id)){this.map.removeLayer(this.renderer.id);removed=true;}}catch{/* Style may already be destroyed after context loss. */}
-  if(!removed)this.renderer?.dispose();this.renderer=undefined;this.displayed=false;
+  for(const p of this.pending.values()){clearTimeout(p.timer);p.abort.abort();}this.pending.clear();this.ids.clear();this.queue=[];this.worker?.terminate();this.worker=undefined;this.near?.destroy();
+  try{if(this.map.getLayer(this.layer.id))this.map.removeLayer(this.layer.id);else this.layer.dispose();}catch{this.layer.dispose();}
  }
 }

@@ -32,3 +32,8 @@ secrets*.json
 *.zip
 tmp/
 .cache/
+
+# Deterministic worker build products (prepared by npm lifecycle hooks).
+public/noct-facade-worker-*.js
+lib/facade-worker-entry.generated.ts
+public/noct-facade-worker-LICENSES.txt

@@ -12,6 +12,7 @@ import {cameraPlan,arrivalBearing,FINAL_ZOOM,targetRegion} from '@/lib/camera-pl
 import type {TourStop} from '@/lib/tour';
 import {EventTour} from '@/lib/tour';
 import {TrafficLayer} from '@/lib/traffic-layer';
+import {installFacadeMaterials} from '@/lib/facade-materials';
 import {buildingLayerWithFacades} from '@/lib/facade-state';
 import type {FacadeMap} from '@/lib/facade-map';
 export interface MapCommand {id:number;action:'center'|'zoom-in'|'zoom-out'}
@@ -162,7 +163,7 @@ export default function CityMap({onSelect,activeIds,typing,blocked,panelOpen,sea
    }
    container.addEventListener('pointerdown',pointerStart,{passive:true});container.addEventListener('wheel',manual,{passive:true});container.addEventListener('keydown',manual);window.addEventListener('pointerup',pointerEnd,{passive:true});window.addEventListener('pointercancel',pointerEnd,{passive:true});
    document.addEventListener('visibilitychange',visibility);media.addEventListener('change',motion);
-   instance.on('style.load',()=>{if(disposed)return;instance?.setSourceTileLodParams(profile.lodLevels,profile.lodRatio);if(instance){traffic=new TrafficLayer(profile,text=>{lastTraffic=' '+text;report()});trafficRef.current=traffic;instance.addLayer(traffic);syncTraffic();instance.on('moveend',scheduleRecovery)}controller?.start();report();
+   instance.on('style.load',()=>{if(disposed)return;if(instance)installFacadeMaterials(instance);instance?.setSourceTileLodParams(profile.lodLevels,profile.lodRatio);if(instance){traffic=new TrafficLayer(profile,text=>{lastTraffic=' '+text;report()});trafficRef.current=traffic;instance.addLayer(traffic);syncTraffic();instance.on('moveend',scheduleRecovery)}controller?.start();report();
     const generation=++facadeGeneration;facades?.destroy();facades=undefined;
     void import('@/lib/facade-map').then(({FacadeMap})=>{if(!disposed&&instance&&generation===facadeGeneration)facades=new FacadeMap(instance,{mobile:profile.tier==='economy'||media.matches||window.matchMedia('(pointer: coarse)').matches});}).catch(()=>{/* Original buildings remain the fallback if the optional renderer cannot load. */});
    });

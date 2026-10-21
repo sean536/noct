@@ -1,16 +1,9 @@
-import type {ExpressionSpecification,FillExtrusionLayerSpecification,Map as GLMap} from 'maplibre-gl';
+import type {Map as GLMap} from 'maplibre-gl';
 
 export const FACADES_STATE='noct_facade_ready';
 
 /** Feature-state changes paint buffers without rebuilding source tiles or changing camera state. */
-export function buildingLayerWithFacades(original:FillExtrusionLayerSpecification):FillExtrusionLayerSpecification{
- const value=original.paint?.['fill-extrusion-height'];
- const height:number|ExpressionSpecification=typeof value==='number'||Array.isArray(value)?value:['get','render_height'];
- return {...original,paint:{...original.paint,
-  'fill-extrusion-height':['case',['boolean',['feature-state',FACADES_STATE],false],0,height],
-  'fill-extrusion-height-transition':{duration:0,delay:0}
- }};
-}
+export {facadeBuildingLayer as buildingLayerWithFacades} from './facade-materials';
 
 /** Owns one state key only. Hover state, source filters, heights and unrelated buildings are untouched. */
 export class FacadeState {
