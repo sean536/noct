@@ -1,2 +1,10 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {createElement} from 'react';import {renderToString} from 'react-dom/server';import Home from '../app/page';
-test('initial server render has one greeting, one input and requested chips, without event or chat panels',()=>{const html=renderToString(createElement(Home));assert.equal((html.match(/<h1\b/g)||[]).length,1);assert.equal(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim(),'Worauf hast du heute Lust?');assert.equal((html.match(/<input\b/g)||[]).length,1);assert.match(html,/placeholder="Sag mir deinen Vibe …"/);for(const chip of ['Afrobeat','Techno','Hip-Hop','Rooftop','Bars','Dates','Heute Abend'])assert.ok(html.includes('>'+chip+'</button>'));assert.ok(!html.includes('class="results-sheet'));assert.ok(!html.includes('class="conversation'));assert.ok(!html.includes('class="tonight-card'));assert.ok(!html.includes('class="composer-caption'));assert.ok(!html.includes('DEIN KI-NIGHTLIFE-GUIDE'));assert.ok(html.includes('Berlin'));});
+test('approved start screen has one greeting/composer, five genre chips, header and navigation without fake map or open sheets',()=>{
+ const html=renderToString(createElement(Home));
+ assert.equal((html.match(/<h1\b/g)||[]).length,1);
+ assert.equal(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim(),'Worauf hast du heute Lust?');
+ assert.equal((html.match(/<input\b/g)||[]).length,1);assert.match(html,/placeholder="Frag NOCT …"/);
+ for(const chip of ['Afro','Techno','House','Rooftop','Bars'])assert.ok(html.includes('>'+chip+'</button>'));
+ for(const label of ['Karte','Chat','Gemerkt','Filter öffnen'])assert.ok(html.includes('aria-label="'+label+'"'));
+ assert.ok(html.includes('NOCT'));assert.ok(html.includes('Berlin'));assert.ok(!html.includes('map-slot'));assert.ok(!html.includes('<iframe'));assert.ok(!html.includes('class="sheet '));
+});

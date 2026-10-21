@@ -1,45 +1,125 @@
 'use client';
 import dynamic from 'next/dynamic';
-import {useState,useEffect,useRef,useCallback} from 'react';
-import {ArrowUp,ArrowUpRight,MapPin,Bookmark,Sparkles,X,ChevronDown,Check,Calendar,Clock,Ticket,ArrowLeft,Compass,Info,Map as MapIcon,Plus,Minus,LocateFixed} from 'lucide-react';
-import {events,priceLabel,dateLabel,type NightEvent} from '@/lib/events';
+import {useState,useEffect,useRef,useCallback,useMemo} from 'react';
+import {Map as MapIcon,MessageSquare,Heart,ChevronDown,Check,SlidersHorizontal,Plus,Minus,LocateFixed,Info,RotateCcw,X} from 'lucide-react';
+import {events,type NightEvent} from '@/lib/events';
 import {recommend,type Preferences} from '@/lib/chat';
-import Poster from '@/components/Poster';
+import {matchesFilters,primaryGenres,type DiscoveryGenre} from '@/lib/event-filters';
 import type {FocusRequest,MapCommand} from '@/components/CityMap';
-import Modal from '@/components/Modal';
+import Composer from '@/components/Composer';
+import NoctSheet from '@/components/NoctSheet';
+import EventCard from '@/components/EventCard';
+import EventDetails from '@/components/EventDetails';
+
 const CityMap=dynamic(()=>import('@/components/CityMap'),{ssr:false,loading:()=> <div className="city-map map-loading"/>});
-const quick=['Afrobeat','Techno','Hip-Hop','Rooftop','Bars','Dates','Heute Abend'];
-type Message={role:'user'|'assistant';text:string};
+type Panel='chat'|'saved'|'filter'|null;
+type Message={role:'user'|'assistant';text:string;eventIds?:string[]};
+const allGenres=[...primaryGenres,{label:'Hip-Hop',value:'Hip-Hop' as const},{label:'Dates',value:'Dates' as const}];
+
 export default function Home(){
- const [input,setInput]=useState(''),[messages,setMessages]=useState<Message[]>([]),[preferences,setPreferences]=useState<Preferences>({}),[results,setResults]=useState<NightEvent[]>([]),[panel,setPanel]=useState<'results'|'saved'|null>(null),[selected,setSelected]=useState<NightEvent|null>(null),[saved,setSaved]=useState<string[]>([]),[about,setAbout]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
- const [cityMenu,setCityMenu]=useState(false),[typing,setTyping]=useState(false),[focusRequest,setFocusRequest]=useState<FocusRequest|null>(null),[mapCommand,setMapCommand]=useState<MapCommand|null>(null),[mapDiagnostics,setMapDiagnostics]=useState('Kartenverbindung wird aufgebaut.');
- const commandId=useRef(0);
- const issueMapCommand=(action:MapCommand['action'])=>{setMapCommand({id:++commandId.current,action});setCityMenu(false)};
- useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setCityMenu(false)};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key)},[]);
- const history=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),inputRef=useRef<HTMLInputElement>(null);
- useEffect(()=>{const viewport=window.visualViewport;const update=()=>{document.documentElement.style.setProperty('--app-height',`${viewport?.height||window.innerHeight}px`);document.documentElement.classList.toggle('keyboard-open',(viewport?.height||window.innerHeight)<window.innerHeight-130)};update();viewport?.addEventListener('resize',update);window.addEventListener('resize',update);return()=>{viewport?.removeEventListener('resize',update);window.removeEventListener('resize',update)}},[]);
- useEffect(()=>{try{const value=JSON.parse(localStorage.getItem('noct-saved')||'[]');if(Array.isArray(value))setSaved(value.filter((x):x is string=>typeof x==='string'&&events.some(e=>e.id===x)))}catch{}return()=>{if(timer.current)clearTimeout(timer.current)}},[]);
- useEffect(()=>{history.current?.scrollTo({top:history.current.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})},[messages,busy]);
- const toggleSave=(id:string)=>setSaved(current=>{const next=current.includes(id)?current.filter(x=>x!==id):[...current,id];try{localStorage.setItem('noct-saved',JSON.stringify(next))}catch{setNotice('Speichern ist in diesem Browser nur für diese Sitzung möglich.')}return next});
- const send=(text:string)=>{if(!text.trim()||busy)return;const clean=text.trim().slice(0,500);inputRef.current?.blur();setTyping(false);setInput('');setMessages(old=>[...old,{role:'user',text:clean}]);setBusy(true);setPanel(null);timer.current=setTimeout(()=>{const response=recommend(clean,preferences);setPreferences(response.preferences);setResults(response.events);if(response.events[0])setFocusRequest({id:++commandId.current,eventId:response.events[0].id});setMessages(old=>[...old,{role:'assistant',text:response.text}]);setPanel('results');setBusy(false);},450)};
- const selectEvent=(event:NightEvent)=>{setFocusRequest({id:++commandId.current,eventId:event.id,allowWhileDialog:true});setSelected(event)};
- const closeModal=useCallback(()=>setSelected(null),[]),closeAbout=useCallback(()=>setAbout(false),[]);
- const displayed=panel==='saved'?events.filter(e=>saved.includes(e.id)):results;
- const explore=()=>{setResults(events);setPanel('results')};
- return <main className="app-shell minimal-start">
- <CityMap onSelect={selectEvent} activeIds={panel?displayed.map(e=>e.id):null} typing={typing} blocked={!!selected||about||cityMenu} panelOpen={!!panel} searching={busy} focusRequest={focusRequest} command={mapCommand} onDiagnostics={setMapDiagnostics}/>
- <header className="minimal-topbar"><button className="city-toggle" onClick={()=>setCityMenu(!cityMenu)} aria-expanded={cityMenu} aria-controls="city-menu">Berlin <ChevronDown size={14}/></button></header>
- {cityMenu&&<><button className="city-dismiss" aria-label="Stadtmenü schließen" onClick={()=>setCityMenu(false)}/><section id="city-menu" className="city-menu glass" aria-label="Stadt und Optionen"><button onClick={()=>issueMapCommand('center')}><LocateFixed size={17}/>Berlin <Check size={15}/></button><p>Berlin ist die erste Demo-Stadt.</p><button onClick={()=>{explore();setCityMenu(false)}}><MapIcon size={17}/>Events entdecken</button><button onClick={()=>{setPanel('saved');setCityMenu(false)}}><Bookmark size={17}/>Gespeichert{saved.length>0&&<span>{saved.length}</span>}</button><hr/><div className="city-zoom"><button aria-label="Karte vergrößern" onClick={()=>issueMapCommand('zoom-in')}><Plus size={17}/></button><button aria-label="Karte verkleinern" onClick={()=>issueMapCommand('zoom-out')}><Minus size={17}/></button></div><hr/><button onClick={()=>{setAbout(true);setCityMenu(false)}}><Info size={17}/>Über die Demo</button><p className="map-diagnostics" role="status">{mapDiagnostics}</p></section></>}
- {!messages.length&&!panel&&<section className="greeting"><h1>Worauf hast du<br className="hero-break"/> heute <span>Lust?</span></h1></section>}
- {messages.length>0&&!panel&&<section className="conversation glass" aria-label="Demo-Chatverlauf"><div className="conversation-top"><span><Sparkles size={14}/> Dein Vibe-Chat <small>Lokale Demo</small></span><button className="icon-button" aria-label="Chat zurücksetzen" onClick={()=>{setMessages([]);setPreferences({});setResults([])}}><RotateSymbol/></button></div><div className="conversation-messages" ref={history} role="log" aria-live="polite">{messages.map((m,i)=><div className={`message message-${m.role}`} key={i}>{m.role==='assistant'&&<span className="assistant-star">✳</span>}<p>{m.text}</p></div>)}{busy&&<div className="thinking">Dein Abend nimmt Form an<span>•••</span></div>}</div>{results.length>0&&<button className="show-results" onClick={()=>setPanel('results')}>{results.length} Empfehlungen ansehen <ArrowUpRight size={16}/></button>}</section>}
- {panel&&<section className="results-sheet glass" aria-label={panel==='saved'?'Gespeicherte Demo-Events':'Demo-Empfehlungen'}><div className="sheet-handle"/><div className="sheet-heading"><div><div className="eyebrow">{panel==='saved'?'DEINE MERKLISTE':'FÜR DEINEN VIBE'}</div><h2>{panel==='saved'?'Für später gespeichert.':'Deine Nacht wartet.'}<span>{displayed.length}</span></h2></div><button className="icon-button" aria-label="Empfehlungen schließen" onClick={()=>setPanel(null)}><X size={20}/></button></div>
- {panel==='results'&&messages.length>0&&<p className="recommendation-summary" role="status">{messages[messages.length-1]?.text}</p>}
- <div className="event-list">{displayed.map(event=><article className="event-card" key={event.id} aria-label={`Demo-Event ${event.name}`}><button className="poster-button" onClick={()=>selectEvent(event)} aria-label={`${event.name}: Event ansehen`}><Poster event={event}/></button><div className="event-info"><div className="event-meta"><span>{event.genre}</span><span className="demo-badge">DEMO</span></div><h3>{event.name}</h3><p>{event.venue} <span>· {event.district}</span></p><div className="event-time">{dateLabel(event.date)} · {event.time} <span>{priceLabel(event.price)}</span></div><button className="event-link" onClick={()=>selectEvent(event)}>Event ansehen <ArrowUpRight size={14}/></button></div><button className={`save-button ${saved.includes(event.id)?'is-saved':''}`} aria-label={`${event.name} ${saved.includes(event.id)?'entfernen':'speichern'}`} aria-pressed={saved.includes(event.id)} onClick={()=>toggleSave(event.id)}><Bookmark size={18} fill={saved.includes(event.id)?'currentColor':'none'}/></button></article>)}{!displayed.length&&<div className="empty-state"><Compass size={28}/><h3>{panel==='saved'?'Gute Nächte vergisst man nicht.':'Noch kein Match.'}</h3><p>{panel==='saved'?'Tippe bei einem Event auf das Lesezeichen. Deine Auswahl bleibt auf diesem Gerät gespeichert.':'Ändere deinen Vibe, Bezirk oder dein Budget im Chat.'}</p><button onClick={explore}>Alle Demo-Events entdecken <ArrowUpRight size={15}/></button></div>}</div>
- <div className="sheet-footer"><Info size={12}/> Demo-Events an realen Orten. Kein bestätigtes Programm.</div></section>}
- <section className="composer-area" aria-label="Nightlife-Chat"><div className="quick-replies">{quick.map(q=><button className={preferences.genre===q?'selected':''} key={q} onClick={()=>send(q)} disabled={busy}>{q}</button>)}</div><form className="composer glass" onSubmit={e=>{e.preventDefault();send(input)}}><label className="sr-only" htmlFor="vibe">Sag mir deinen Vibe</label><input ref={inputRef} id="vibe" placeholder="Sag mir deinen Vibe …" value={input} onChange={e=>setInput(e.target.value)} maxLength={500} autoComplete="off" enterKeyHint="send" onFocus={()=>setTyping(true)} onBlur={()=>setTyping(false)}/><button className="send-button" type="submit" aria-label="Nachricht senden" disabled={!input.trim()||busy}><ArrowUp size={21}/></button></form></section>
- {notice&&<div className="toast" role="status">{notice}<button aria-label="Hinweis schließen" onClick={()=>setNotice('')}><X size={16}/></button></div>}
- {selected&&<Modal title="Event entdecken" onClose={closeModal}><Poster event={selected} large/><div className="detail-body"><div className="event-meta"><span>{selected.genre}</span><span className="demo-badge">FIKTIVES DEMO-EVENT</span></div><h2>{selected.name}</h2><p className="detail-venue"><MapPin size={15}/>{selected.venue} · {selected.district}, Berlin</p><p className="detail-description">{selected.description}</p>{selected.address&&<p className="detail-address">{selected.address} · <a href={selected.locationSource} target="_blank" rel="noopener noreferrer">Ort auf OpenStreetMap ↗</a></p>}<div className="detail-facts"><span><Calendar size={16}/>{dateLabel(selected.date)}</span><span><Clock size={16}/>{selected.time} Uhr</span><span><Ticket size={16}/>{priceLabel(selected.price)}</span></div><div className="tags">{selected.tags.map(t=><span key={t}>{t}</span>)}</div><button className="primary-button" onClick={()=>toggleSave(selected.id)}>{saved.includes(selected.id)?<Check size={18}/>:<Bookmark size={18}/>} {saved.includes(selected.id)?'Gespeichert · Entfernen':'Für später speichern'}</button>{(selected.ticket.affiliateUrl||selected.ticket.url)?<a className="ticket-link" href={selected.ticket.affiliateUrl||selected.ticket.url||'#'} target="_blank" rel="noopener noreferrer sponsored">Zum Ticketanbieter ↗</a>:<p className="ticket-note">Demo ohne Ticketverkauf. Preise und Zeiten sind Beispieldaten. Die Location ist real; dieses Event und seine Konditionen sind erfunden und stehen in keiner Verbindung zum tatsächlichen Programm.</p>}</div></Modal>}
- {about&&<Modal title="Über NOCT" onClose={closeAbout}><div className="about-body"><span className="wordmark">noct</span><h2>Deine Stadt.<br/>Deine Nacht.</h2><p>Dein persönlicher Ausgangspunkt für Berlin nach Sonnenuntergang.</p><div className="about-note"><Sparkles size={20}/><div><strong>Ein interaktiver Prototyp</strong><p>Der Chat antwortet lokal mit Regeln, ohne KI-API. Events, Preise, Zeiten und Artworks sind fiktive Beispiele vom 20.10.2026 an realen Locations; keine bestätigten Angebote oder Verbindung zu den Betreibern. Es werden keine Nachrichten an einen KI-Anbieter gesendet.</p></div></div><p>Die Luftbilder stammen von Geoportal Berlin. 3D-Grundrisse kommen aus OpenStreetMap über OpenFreeMap, mit genäherten Höhen aus den Daten. Keine fotorealistischen oder amtlich vermessenen LoD2-Gebäude. Bei fehlenden 3D-Daten bleiben Luftbilder und Event-Pins bedienbar. Die Tour wartet bei Karteninteraktion und Texteingabe und kehrt nach sechs ruhigen Sekunden automatisch zurück, sobald keine Empfehlungen oder Details mehr geöffnet sind. Merkliste: nur auf diesem Gerät.</p><button className="primary-button" onClick={closeAbout}>Die Nacht entdecken <ArrowUpRight size={18}/></button></div></Modal>}
- </main>
+ const [input,setInput]=useState(''),[messages,setMessages]=useState<Message[]>([]),[preferences,setPreferences]=useState<Preferences>({});
+ const [panel,setPanel]=useState<Panel>(null),[selected,setSelected]=useState<NightEvent|null>(null),[saved,setSaved]=useState<string[]>([]),[hydrated,setHydrated]=useState(false);
+ const [cityMenu,setCityMenu]=useState(false),[about,setAbout]=useState(false),[busy,setBusy]=useState(false),[typing,setTyping]=useState(false),[notice,setNotice]=useState('');
+ const [focusRequest,setFocusRequest]=useState<FocusRequest|null>(null),[mapCommand,setMapCommand]=useState<MapCommand|null>(null),[mapDiagnostics,setMapDiagnostics]=useState('Kartenverbindung wird aufgebaut.');
+ const commandId=useRef(0),timer=useRef<ReturnType<typeof setTimeout>|null>(null),requestBusy=useRef(false),history=useRef<HTMLDivElement>(null),latestPreferences=useRef(preferences);
+ latestPreferences.current=preferences;
+ const modalOpen=!!selected||about||panel==='filter';
+ const filtered=useMemo(()=>events.filter(event=>matchesFilters(event,preferences)),[preferences]);
+ const lastResponse=messages.findLast(message=>message.role==='assistant');
+ const recommendedIds=lastResponse?.eventIds;
+ const activeIds=useMemo(()=>{
+  if(panel==='saved')return filtered.filter(event=>saved.includes(event.id)).map(event=>event.id);
+  if(panel==='chat'&&recommendedIds)return filtered.filter(event=>recommendedIds.includes(event.id)).map(event=>event.id);
+  return Object.keys(preferences).length?filtered.map(event=>event.id):null;
+ },[panel,filtered,saved,recommendedIds,preferences]);
+ const filterCount=Number(!!preferences.genre)+Number(preferences.budget!==undefined)+Number(!!preferences.district);
+ const closePanel=useCallback(()=>{setPanel(null);setTyping(false);},[]);
+ const closeDetail=useCallback(()=>setSelected(null),[]),closeAbout=useCallback(()=>setAbout(false),[]);
+
+ useEffect(()=>{
+  const viewport=window.visualViewport;
+  const update=()=>{
+   const height=viewport?.height||window.innerHeight;
+   document.documentElement.style.setProperty('--app-height',`${height}px`);
+   document.documentElement.style.setProperty('--viewport-top',`${viewport?.offsetTop||0}px`);
+   document.documentElement.classList.toggle('keyboard-open',window.innerHeight-height>130&&document.activeElement instanceof HTMLInputElement);
+  };
+  update();viewport?.addEventListener('resize',update);viewport?.addEventListener('scroll',update);window.addEventListener('resize',update);document.addEventListener('focusin',update);document.addEventListener('focusout',update);
+  return()=>{viewport?.removeEventListener('resize',update);viewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);document.removeEventListener('focusin',update);document.removeEventListener('focusout',update);document.documentElement.classList.remove('keyboard-open');document.documentElement.style.removeProperty('--app-height');document.documentElement.style.removeProperty('--viewport-top');};
+ },[]);
+ useEffect(()=>{
+  try{const value:unknown=JSON.parse(localStorage.getItem('noct-saved')||'[]');if(Array.isArray(value))setSaved(value.filter((id):id is string=>typeof id==='string'&&events.some(event=>event.id===id)));}catch{}
+  setHydrated(true);return()=>{if(timer.current)clearTimeout(timer.current);};
+ },[]);
+ useEffect(()=>{if(hydrated)try{localStorage.setItem('noct-saved',JSON.stringify(saved));}catch{setNotice('Speichern ist nur für diese Sitzung möglich.');}},[saved,hydrated]);
+ useEffect(()=>{if(!notice)return;const id=setTimeout(()=>setNotice(''),2400);return()=>clearTimeout(id);},[notice]);
+ useEffect(()=>{history.current?.scrollTo({top:history.current.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},[messages,busy,panel,preferences]);
+ useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape')setCityMenu(false);};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
+
+ const toggleSave=(id:string)=>{setSaved(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);setNotice(saved.includes(id)?'Entfernt':'Gemerkt');};
+ const send=(text:string)=>{
+  const clean=text.trim().slice(0,500);if(!clean||requestBusy.current)return;
+  requestBusy.current=true;setInput('');setPanel('chat');setCityMenu(false);setBusy(true);setMessages(old=>[...old,{role:'user',text:clean}]);
+  timer.current=setTimeout(()=>{
+   const response=recommend(clean,latestPreferences.current);
+   setPreferences(response.preferences);setMessages(old=>[...old,{role:'assistant',text:response.text,eventIds:response.events.map(event=>event.id)}]);
+   if(response.events[0])setFocusRequest({id:++commandId.current,eventId:response.events[0].id});
+   requestBusy.current=false;timer.current=null;setBusy(false);
+  },450);
+ };
+ const resetChat=()=>{if(timer.current)clearTimeout(timer.current);timer.current=null;requestBusy.current=false;setBusy(false);setMessages([]);setPreferences({});setInput('');};
+ const selectEvent=(event:NightEvent)=>{setFocusRequest({id:++commandId.current,eventId:event.id,allowWhileDialog:true});setSelected(event);setCityMenu(false);};
+ const explore=()=>{setMessages(old=>[...old,{role:'assistant',text:'Unsere Demo-Events an realen Berliner Locations. Datum, Zeiten und Preise sind Beispieldaten.',eventIds:events.map(event=>event.id)}]);setPanel('chat');setCityMenu(false);};
+ const issueMapCommand=(action:MapCommand['action'])=>{setMapCommand({id:++commandId.current,action});setCityMenu(false);};
+ const navigate=(next:Panel)=>{setPanel(next);setSelected(null);setAbout(false);setCityMenu(false);setTyping(false);};
+ const setGenre=(genre:DiscoveryGenre|undefined)=>setPreferences(current=>{const next={...current};if(genre)next.genre=genre;else delete next.genre;return next;});
+ const setBudget=(budget:number|undefined)=>setPreferences(current=>{const next={...current};if(budget!==undefined)next.budget=budget;else delete next.budget;return next;});
+ const renderCard=(event:NightEvent)=><EventCard key={event.id} event={event} saved={saved.includes(event.id)} onSave={toggleSave} onOpen={selectEvent}/>;
+
+ return <main className="app-shell">
+  <div className="map-stage" inert={modalOpen||undefined}><CityMap onSelect={selectEvent} activeIds={activeIds} typing={typing} blocked={modalOpen||cityMenu} panelOpen={!!panel} searching={busy} focusRequest={focusRequest} command={mapCommand} onDiagnostics={setMapDiagnostics}/></div>
+  <div className={`viewport-ui ${panel?'has-panel':''}`}>
+   <div className="ui" inert={modalOpen||undefined}>
+    <header className="noct-header">
+     <button className="pill glass" id="cityBtn" aria-label="Stadt auswählen, Berlin" aria-expanded={cityMenu} aria-controls="cities" onClick={()=>setCityMenu(value=>!value)}><span className="logo">NOCT</span><span className="city-divider" aria-hidden="true">|</span><span>Berlin</span><ChevronDown size={12}/></button>
+     <button className="pill glass" id="filterBtn" aria-label="Filter öffnen" onClick={()=>{setCityMenu(false);setPanel('filter');}}><SlidersHorizontal size={16}/>{filterCount>0&&<span className="badge">{filterCount}</span>}</button>
+    </header>
+    <section className={`hero ${panel==='chat'||!!selected||about?'away':''}`} aria-label="Deinen Abend entdecken" inert={panel==='chat'||!!selected||about||undefined}>
+     <h1>Worauf hast du heute Lust?</h1>
+     <Composer id="homeInput" home value={input} onChange={setInput} onSend={send} onTyping={setTyping} busy={busy}/>
+     <div className="chips" aria-label="Schnellvorschläge">{primaryGenres.map(genre=><button className="chip" key={genre.value} aria-pressed={preferences.genre===genre.value} onClick={()=>send(genre.label)} disabled={busy}>{genre.label}</button>)}</div>
+    </section>
+    <nav className="tabbar glass" aria-label="Hauptnavigation">
+     <button className="tab" aria-label="Karte" aria-pressed={!panel} onClick={()=>navigate(null)}><MapIcon size={22}/></button>
+     <button className="tab" aria-label="Chat" aria-pressed={panel==='chat'} onClick={()=>navigate('chat')}><MessageSquare size={22}/></button>
+     <button className="tab" aria-label="Gemerkt" aria-pressed={panel==='saved'} onClick={()=>navigate('saved')} aria-describedby={saved.length?'saved-count':undefined}><Heart size={22}/>{saved.length>0&&<><span className="badge" aria-hidden="true"/><span className="sr-only" id="saved-count">{saved.length} gemerkte Events</span></>}</button>
+    </nav>
+   </div>
+   {cityMenu&&<><button className="city-dismiss" aria-label="Stadtmenü schließen" onClick={()=>setCityMenu(false)}/><section id="cities" className="cities glass open" aria-label="Stadt und Optionen">
+    <div role="group" aria-label="Städte"><button aria-pressed onClick={()=>issueMapCommand('center')}>Berlin <Check size={15}/></button>{['Hamburg','London'].map(city=><button disabled key={city}>{city}<span>Demnächst</span></button>)}</div>
+    <hr/><button onClick={explore}>Events entdecken <MapIcon size={15}/></button><button onClick={()=>{setAbout(true);setCityMenu(false);}}>Über NOCT <Info size={15}/></button>
+    <div className="city-zoom" role="group" aria-label="Kartenzoom"><button aria-label="Karte vergrößern" onClick={()=>issueMapCommand('zoom-in')}><Plus size={17}/></button><button aria-label="Karte verkleinern" onClick={()=>issueMapCommand('zoom-out')}><Minus size={17}/></button><button aria-label="Berlin zentrieren" onClick={()=>issueMapCommand('center')}><LocateFixed size={17}/></button></div>
+    <p className="map-diagnostics" role="status">{mapDiagnostics}</p>
+   </section></>}
+   {modalOpen&&<div className="scrim on" aria-hidden="true" onClick={()=>{if(selected)closeDetail();else if(about)closeAbout();else closePanel();}}/>}
+   {panel==='chat'&&<div inert={modalOpen||undefined} className="panel-host"><NoctSheet id="chat" title="Concierge" onClose={closePanel} tools={<><span className="chat-kind">Lokale Demo</span><button className="x" aria-label="Chat zurücksetzen" onClick={resetChat}><RotateCcw size={14}/></button></>} footer={<div className="chat-foot"><Composer id="chatInput" value={input} onChange={setInput} onSend={send} onTyping={setTyping} busy={busy}/></div>}>
+    <div className="scroll" ref={history} role="log" aria-live="polite" aria-label="Chatverlauf">
+     {!messages.length&&<><div className="msg ai">Nenne Musikrichtung, Bezirk oder Budget. Ich suche in unseren Demo-Events.</div><button className="browse-events" onClick={explore}>Alle Demo-Events entdecken</button></>}
+     {messages.map((message,index)=><div className="message-group" key={index}><div className={`msg ${message.role==='user'?'me':'ai'}`}>{message.text}</div>{message.eventIds&&<div className="recommendations" aria-label="Demo-Empfehlungen">{events.filter(event=>message.eventIds!.includes(event.id)&&matchesFilters(event,preferences)).map(renderCard)}{message.eventIds.length>0&&!events.some(event=>message.eventIds!.includes(event.id)&&matchesFilters(event,preferences))&&<p className="empty">Keine dieser Empfehlungen passt zum aktuellen Filter. Passe den Filter an oder frage nach einem anderen Vibe.</p>}</div>}</div>)}
+     {busy&&<div className="msg ai typing" role="status" aria-label="NOCT sucht Demo-Empfehlungen"><i/><i/><i/></div>}
+    </div>
+   </NoctSheet></div>}
+   {panel==='saved'&&<div inert={modalOpen||undefined} className="panel-host"><NoctSheet id="saved" title="Gemerkt" onClose={closePanel}><div className="scroll">{filtered.filter(event=>saved.includes(event.id)).map(renderCard)}{!filtered.some(event=>saved.includes(event.id))&&<div className="empty">{saved.length?'Keine gemerkten Events passen zum aktuellen Filter.':'Noch nichts gemerkt.'}<br/>{saved.length?<button onClick={()=>setPanel('filter')}>Filter anpassen</button>:<>Tippe auf das Herz, um ein Event zu sichern.<br/><button onClick={explore}>Events entdecken</button></>}</div>}</div></NoctSheet></div>}
+   {panel==='filter'&&!selected&&!about&&<NoctSheet id="filter" title="Filter" variant="short" modal returnFocusId="filterBtn" onClose={closePanel} footer={<div className="actions"><button className="btn sec" onClick={()=>setPreferences({})}>Zurücksetzen</button><button className="btn main" onClick={closePanel}>Fertig</button></div>}>
+    <div className="scroll"><fieldset className="group"><legend>Musikrichtung</legend><div className="row"><button className="chip" aria-pressed={!preferences.genre} onClick={()=>setGenre(undefined)}>Alle</button>{allGenres.map(genre=><button className="chip" key={genre.value} aria-pressed={preferences.genre===genre.value} onClick={()=>setGenre(genre.value)}>{genre.label}</button>)}</div></fieldset>
+     <fieldset className="group"><legend>Eintritt</legend><div className="row"><button className="chip" aria-pressed={preferences.budget===undefined} onClick={()=>setBudget(undefined)}>Alle</button><button className="chip" aria-pressed={preferences.budget===0} onClick={()=>setBudget(0)}>Frei</button><button className="chip" aria-pressed={preferences.budget===15} onClick={()=>setBudget(15)}>Bis 15 €</button>{preferences.budget!==undefined&&![0,15].includes(preferences.budget)&&<button className="chip" aria-pressed title="Budgetfilter entfernen" onClick={()=>setBudget(undefined)}>Bis {preferences.budget} €</button>}</div></fieldset>
+     {preferences.district&&<fieldset className="group"><legend>Bezirk aus deinem Chat</legend><button className="chip" onClick={()=>setPreferences(current=>{const next={...current};delete next.district;return next;})}>{preferences.district} · Entfernen</button></fieldset>}
+     <p className="filter-result" role="status">{filtered.length} passende Demo-Events</p>
+    </div>
+   </NoctSheet>}
+   {selected&&<EventDetails event={selected} saved={saved.includes(selected.id)} onSave={toggleSave} onClose={closeDetail}/>}
+   {about&&<NoctSheet id="about" title="Über NOCT" variant="tall" modal onClose={closeAbout}><div className="scroll about-body"><span className="logo">NOCT</span><h2>Deine Stadt. Deine Nacht.</h2><p>Der Chat antwortet lokal mit Regeln, ohne KI-API. Es werden keine Nachrichten an einen KI-Anbieter gesendet.</p><p>Alle Events, Preise, Zeiten und Artworks sind fiktive Beispiele vom 20.10.2026 an realen Berliner Locations. Kein bestätigtes Programm und keine Verbindung zu den Betreibern. Kein Ticketverkauf.</p><p>Luftbilder: Geoportal Berlin. Gebäudegrundrisse: OpenStreetMap über OpenFreeMap. Prozedurale Fassaden, Dächer und Fensterbeleuchtung sind gestalterische Simulationen, keine echten Fassadenaufnahmen. Bei fehlenden 3D-Daten bleiben Luftbilder und Event-Pins bedienbar.</p><p>Die bestehende Tour pausiert bei Karteninteraktion, Texteingabe und geöffneten Panels. Die Merkliste bleibt auf diesem Gerät gespeichert. Hamburg und London sind noch nicht verfügbar.</p></div></NoctSheet>}
+   {notice&&<div className="toast glass on" role="status">{notice}<button aria-label="Hinweis schließen" onClick={()=>setNotice('')}><X size={14}/></button></div>}
+  </div>
+ </main>;
 }
-function RotateSymbol(){return <ArrowLeft size={17}/>}
