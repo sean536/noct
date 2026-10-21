@@ -2,6 +2,8 @@
 
 Stand: 21.10.2026, Branch `feature/noct-3d`. Die separate vollständige Testwebsite ist https://noct-facades-test.tuned-cove-5285.chatgpt.site. Der Zugriff bleibt entsprechend ihrer aktuellen Freigabe unverändert. Die ursprüngliche öffentliche NOCT-Website, GitHub-`main` und `design/noct-apple` werden nicht aktualisiert.
 
+Die Dachdarstellung wird durch die anschließende [Phase 1: Living Berlin](living-roofs.md) erweitert. Aktuelle Dachmaterialien, zusätzlicher Pufferspeicher und der sichtbare Vergleich sind dort dokumentiert.
+
 ## Ursache und Änderung
 
 Die vorherige Integration zerlegte MultiPolygone bereits korrekt, begrenzte den eigentlichen Fassadenrenderer aber auf 12/20 Grundrisse, Zoom ≥15,4 und verzögerte Bewegungsaktualisierungen. Deshalb dominierten die ursprünglichen einfarbigen Extrusionen weiterhin große Stadtbereiche. Das war ein Abdeckungsproblem, nicht durch längeres Warten lösbar.

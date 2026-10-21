@@ -1,12 +1,16 @@
 import {VectorTile} from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import earcut from 'earcut';
+import {roofStyle} from './roof-material';
 
 export interface CityTile {z:number;x:number;y:number}
 export interface TileMesh extends CityTile {vertices:Float32Array;indices:Uint32Array;buildings:number;invalid:number;bytes:number}
 type P=[number,number];
 const EARTH=40075016.68557849,METER=1/(EARTH*Math.cos(52.505*Math.PI/180));
-export const TILE_VERTEX_SIZE=10;
+export const TILE_VERTEX_SIZE=18;
+const EMPTY_ROOF=[0,0,0,0,0,0,0,0];
+// Stable Berlin-local metric origin avoids float precision loss and texture swimming.
+const ROOF_ORIGIN=[(13.4+180)/360,(1-Math.asinh(Math.tan(52.5*Math.PI/180))/Math.PI)/2];
 export const tileKey=({z,x,y}:CityTile)=>`${z}/${x}/${y}`;
 function signed(r:P[]){let a=0;for(let i=0;i<r.length;i++){const p=r[i],q=r[(i+1)%r.length];a+=p[0]*q[1]-q[0]*p[1];}return a*.5;}
 function clean(r:{x:number;y:number}[],extent:number):P[]{
@@ -38,8 +42,8 @@ export function buildFacadeTile(bytes:ArrayBuffer,tile:CityTile):TileMesh{
  const vt=new VectorTile(new Pbf(new Uint8Array(bytes))),layer=vt.layers.building,values:number[]=[],indices:number[]=[];let buildings=0,invalid=0;
  if(!layer)return {...tile,vertices:new Float32Array(),indices:new Uint32Array(),buildings,invalid,bytes:0};
  const n=2**tile.z,span=1/n,meters=span/METER;
- const push=(p:P,z:number,nx:number,ny:number,roof:number,u:number,seed:number,material:number,extent:number)=>{
-  const index=values.length/TILE_VERTEX_SIZE;values.push(Math.max(0,Math.min(1,p[0]/extent)),Math.max(0,Math.min(1,p[1]/extent)),z,nx,ny,roof,u,z,seed,material);return index;
+ const push=(p:P,z:number,nx:number,ny:number,roof:number,u:number,seed:number,material:number,extent:number,v=z,roofData?:number[])=>{
+  const index=values.length/TILE_VERTEX_SIZE;values.push(Math.max(0,Math.min(1,p[0]/extent)),Math.max(0,Math.min(1,p[1]/extent)),z,nx,ny,roof,u,v,seed,material,...(roofData??EMPTY_ROOF));return index;
  };
  for(let fi=0;fi<layer.length;fi++){
   const feature=layer.feature(fi),p=feature.properties,height=Number(p.render_height),base=Number(p.render_min_height??0);
@@ -71,10 +75,30 @@ export function buildFacadeTile(bytes:ArrayBuffer,tile:CityTile):TileMesh{
    }
    const coords:number[]=[],holes:number[]=[];for(let r=0;r<component.length;r++){if(r)holes.push(coords.length/2);for(const point of component[r])coords.push(...point);}
    let faces:number[];try{faces=earcut(coords,holes,2);}catch{invalid++;return;}
-   const seed=((Math.round(height*97)+Math.round(base*43))%101)/101;
+   const cut=outer.some(point=>point[0]<=0||point[0]>=extent||point[1]<=0||point[1]>=extent);
+   const mean:P=[0,0];let longest=0,heading=0;
+   for(let j=0;j<outer.length;j++){
+    const a=outer[j],b=outer[(j+1)%outer.length],dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy;mean[0]+=a[0]/outer.length;mean[1]+=a[1]/outer.length;
+    if(!cut&&length>longest){longest=length;heading=(Math.atan2(dy,dx)+Math.PI)%Math.PI;}
+   }
+   const roofUv=(point:P):P=>[((tile.x+point[0]/extent)/n-ROOF_ORIGIN[0])/METER,((tile.y+point[1]/extent)/n-ROOF_ORIGIN[1])/METER];
+   const center=roofUv(mean),identity=String(p.osm_id??p['@id']??(cut?'boundary':`${Math.round(center[0])}/${Math.round(center[1])}`))+`/${height}/${base}`;
+   const roof=roofStyle(p,identity);
+   // Largest triangle incircle: the complete decorative patch stays inside the actual roof,
+   // including concave footprints and courtyard holes. Cut components omit accents to avoid duplication.
+   let anchor=mean,radius=0;
+   if(!cut&&roof.flatDetails)for(let i=0;i<faces.length;i+=3){
+    const a:P=[coords[faces[i]*2],coords[faces[i]*2+1]],b:P=[coords[faces[i+1]*2],coords[faces[i+1]*2+1]],c:P=[coords[faces[i+2]*2],coords[faces[i+2]*2+1]];
+    const la=Math.hypot(b[0]-c[0],b[1]-c[1]),lb=Math.hypot(a[0]-c[0],a[1]-c[1]),lc=Math.hypot(a[0]-b[0],a[1]-b[1]),perimeter=la+lb+lc;
+    const r=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))/(perimeter||1);
+    if(r>radius){radius=r;anchor=[(la*a[0]+lb*b[0]+lc*c[0])/perimeter,(la*a[1]+lb*b[1]+lc*c[1])/perimeter];}
+   }
+   const safeRadius=Math.min(6,radius*meters/extent*.80),uvAnchor=roofUv(anchor);
+   const accent=safeRadius<1.25?0:roof.seed<.38?1:roof.seed<.70?2:roof.seed<.94||safeRadius<3?3:4;
+   const roofData=[...roof.color,roof.kind,uvAnchor[0],uvAnchor[1],safeRadius,accent];
    for(let i=0;i<faces.length;i+=3){
     const tri=faces.slice(i,i+3).map(j=>[coords[j*2],coords[j*2+1]] as P),clipped=clipTriangle(tri,extent);if(clipped.length<3)continue;
-    const start=values.length/TILE_VERTEX_SIZE;for(const point of clipped)push(point,height,0,0,1,point[0]/extent*meters,seed,0,extent);
+    const start=values.length/TILE_VERTEX_SIZE;for(const point of clipped){const uv=roofUv(point);push(point,height,0,0,1,uv[0],roof.seed,heading,extent,uv[1],roofData);}
     for(let j=1;j<clipped.length-1;j++)indices.push(start,start+j,start+j+1);emitted=true;
    }
    if(emitted)buildings++;

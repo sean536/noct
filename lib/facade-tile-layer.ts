@@ -1,5 +1,6 @@
 import type {CustomLayerInterface,CustomRenderMethodInput,Map as GLMap} from 'maplibre-gl';
 import {tileKey,type CityTile,type TileMesh,TILE_VERTEX_SIZE} from './facade-tile';
+import {ROOF_SHADER} from './roof-shader';
 
 const vertex=`#version 300 es
 // NOCT_CITY_FACADES: one shared program for complete building tiles.
@@ -8,23 +9,25 @@ layout(location=0) in vec3 a_position;
 layout(location=1) in vec3 a_normal;
 layout(location=2) in vec2 a_meters;
 layout(location=3) in vec2 a_material;
+layout(location=4) in vec4 a_roofMaterial;
+layout(location=5) in vec4 a_roofDetail;
 uniform mat4 u_matrix;
-out vec3 v_normal;out vec2 v_meters;out vec2 v_material;
-void main(){v_normal=a_normal;v_meters=a_meters;v_material=a_material;gl_Position=u_matrix*vec4(a_position,1.);}`;
+out vec3 v_normal;out vec2 v_meters;out vec2 v_material;out vec4 v_roofMaterial;out vec4 v_roofDetail;
+void main(){v_normal=a_normal;v_meters=a_meters;v_material=a_material;v_roofMaterial=a_roofMaterial;v_roofDetail=a_roofDetail;gl_Position=u_matrix*vec4(a_position,1.);}`;
 const fragment=`#version 300 es
 precision highp float;
-in vec3 v_normal;in vec2 v_meters;in vec2 v_material;
+in vec3 v_normal;in vec2 v_meters;in vec2 v_material;in vec4 v_roofMaterial;in vec4 v_roofDetail;
 uniform float u_quality;
 out vec4 fragColor;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float box(vec2 p,vec2 size){vec2 d=size-abs(p),aa=max(fwidth(p)*.85,vec2(.015));return smoothstep(-aa.x,aa.x,d.x)*smoothstep(-aa.y,aa.y,d.y);}
+${ROOF_SHADER}
 void main(){
  float seed=v_material.x;vec3 n=normalize(v_normal);
  float light=.64+.36*max(0.,dot(n,normalize(vec3(-.4,-.6,1.))));
  if(v_normal.z>.5){
-  vec3 roof=mix(vec3(.19,.24,.26),vec3(.34,.35,.32),seed);
-  float seam=1.-smoothstep(.01,.06,abs(mod(v_meters.x,1.2)-.6));
-  fragColor=vec4(pow(roof*(light-seam*.045),vec3(1./2.2)),1.);return;
+  vec3 roof=roofSurface(v_meters,seed,v_material.y,v_roofMaterial,v_roofDetail);
+  fragColor=vec4(pow(max(roof*light,vec3(0.)),vec3(1./2.2)),1.);return;
  }
  float palette=floor(seed*6.);vec3 base=palette<1.?vec3(.47,.50,.49):palette<2.?vec3(.57,.54,.47):palette<3.?vec3(.36,.43,.46):palette<4.?vec3(.53,.45,.39):palette<5.?vec3(.39,.43,.35):vec3(.60,.58,.54);
  float brick=step(.5,v_material.y);base=mix(base,vec3(.40,.23,.17),brick*.85);
@@ -78,7 +81,7 @@ export class FacadeTileLayer implements CustomLayerInterface {
   const gl=this.gl!;const vao=gl.createVertexArray()!,vertex=gl.createBuffer()!,index=gl.createBuffer()!;
   if(!vao||!vertex||!index)throw Error('Facade GPU memory unavailable');
   gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vertex);gl.bufferData(gl.ARRAY_BUFFER,e.mesh.vertices,gl.STATIC_DRAW);
-  for(const [location,size,offset] of [[0,3,0],[1,3,12],[2,2,24],[3,2,32]]){gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,size,gl.FLOAT,false,TILE_VERTEX_SIZE*4,offset);}
+  for(const [location,size,offset] of [[0,3,0],[1,3,12],[2,2,24],[3,2,32],[4,4,40],[5,4,56]]){gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,size,gl.FLOAT,false,TILE_VERTEX_SIZE*4,offset);}
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,index);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,e.mesh.indices,gl.STATIC_DRAW);
   e.gpu={vao,vertex,index,count:e.mesh.indices.length};
  }
