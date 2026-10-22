@@ -6,14 +6,14 @@ function instant(property:Property|undefined):string|null{
  if(!property)return null;const match=property.value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/);if(!match)return null;
  const [,y,m,d,h,min,s,z]=match;const local=`${y}-${m}-${d}T${h}:${min}:${s}`;
  if(z&&(!property.params||property.params===';VALUE=DATE-TIME'))return local+'Z';
- if(!/^;TZID="?Europe\/Berlin"?$/.test(property.params))return null;
+ if(z||!/^;TZID="?Europe\/Berlin"?$/.test(property.params))return null;
  const wall=Date.UTC(+y,+m-1,+d,+h,+min,+s),format=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
  const candidates=[60,120].map(offset=>new Date(wall-offset*60_000)).filter(date=>format.format(date).replace(' ','T')===local);
  return candidates.length===1?candidates[0].toISOString():null;
 }
 export function icalEvents(text:string,source:EventSource,now=Date.now()):NightEvent[]{
  if(source.locationId!=='weekend-club'||!officialURL(source.url,source.locationId)||text.length>2_000_000)return [];
- const lines=text.replace(/\r\n[ \t]|\n[ \t]/g,'').split(/\r?\n/);if(lines[0]!=='BEGIN:VCALENDAR'||!lines.includes('VERSION:2.0'))return [];
+ const lines=text.replace(/\r\n[ \t]|\n[ \t]/g,'').split(/\r?\n/);if(lines[0]!=='BEGIN:VCALENDAR'||!lines.includes('VERSION:2.0')||lines.some(line=>/^METHOD(?:;|:)/i.test(line)&&line.slice(line.indexOf(':')+1).toUpperCase()!=='PUBLISH'))return [];
  const records:unknown[]=[];let properties:Map<string,Property>|null=null,bad=false,components=0;
  for(const line of lines){
   if(line==='BEGIN:VEVENT'){if(properties||++components>1000)return [];properties=new Map();bad=false;continue;}
@@ -22,7 +22,7 @@ export function icalEvents(text:string,source:EventSource,now=Date.now()):NightE
    if(!bad){const get=(key:string)=>properties!.get(key),start=instant(get('DTSTART')),end=get('DTEND')?instant(get('DTEND')):null;
     const name=decode(get('SUMMARY')?.value||''),url=decode(get('URL')?.value||''),place=decode(get('LOCATION')?.value||''),status=get('STATUS')?.value;
     const validPlace=/\bweekend club\b/i.test(place)&&/alexander(?:stra(?:ß|ss)e|str\.?)\s*7\b/i.test(place);
-    const nonPublic=['PRIVATE','CONFIDENTIAL'].includes(get('CLASS')?.value||'');
+    const nonPublic=['PRIVATE','CONFIDENTIAL'].includes(get('CLASS')?.value.toUpperCase()||'');
     if(start&&(!get('DTEND')||end)&&name&&validPlace&&!nonPublic&&(!status||status==='CONFIRMED')&&officialURL(url,source.locationId)&&new URL(url).pathname.startsWith('/upcoming/')){
      const fields=['name','startsAt'];if(end)fields.push('endsAt');
      const genres:Genre[]=['Techno','House','Afrobeat','Hip-Hop'],tags=(get('CATEGORIES')?.value||'').split(',').map(decode).filter((value):value is Genre=>genres.includes(value as Genre));if(tags.length)fields.push('genre');
@@ -31,7 +31,7 @@ export function icalEvents(text:string,source:EventSource,now=Date.now()):NightE
    }properties=null;continue;
   }
   if(line.startsWith('BEGIN:')||line.startsWith('END:')){bad=true;continue;}
-  const colon=line.indexOf(':');if(colon<0){bad=true;continue;}const header=line.slice(0,colon),key=header.split(';')[0],params=header.slice(key.length);
+  const colon=line.indexOf(':');if(colon<0){bad=true;continue;}const header=line.slice(0,colon),key=header.split(';')[0].toUpperCase(),params=header.slice(key.length);
   if(['RRULE','RDATE','EXDATE','RECURRENCE-ID'].includes(key))bad=true;
   if(properties.has(key)&&['SUMMARY','DTSTART','DTEND','URL','LOCATION','STATUS','CLASS','CATEGORIES'].includes(key))bad=true;
   properties.set(key,{params,value:line.slice(colon+1)});

@@ -39,3 +39,8 @@ test('same publisher domain does not establish the correct physical venue',()=>{
  assert.deepEqual(structuredEvents(html(other),amano,TEST_NOW),[]);
  assert.equal(structuredEvents(html({...other,location:{url:amano.url}}),amano,TEST_NOW).length,1);
 });
+test('robots comparison normalizes unreserved percent encoding before deciding permission',()=>{
+ const policy='User-agent: *\nDisallow: /upcoming/private';
+ assert.equal(robotsAllowed(policy,'/upcoming/%70rivate?format=ical'),false);
+ assert.equal(robotsAllowed('User-agent: *\nDisallow: /upcoming/%70rivate','/upcoming/private?format=ical'),false);
+});

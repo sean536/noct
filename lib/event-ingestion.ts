@@ -40,13 +40,15 @@ export function structuredEvents(html:string,source:EventSource,now=Date.now()):
 }
 /** Conservative robots subset: unknown directives or crawl delays require manual review, never bypass. */
 export function robotsAllowed(text:string,path:string):boolean{
- if(text.length>100_000)return false;
+ if(text.length>100_000||/%(?![a-f0-9]{2})/i.test(path))return false;
+ const normalized=(value:string)=>encodeURI(value).replace(/%25([a-f0-9]{2})/gi,'%$1').replace(/%([a-f0-9]{2})/gi,(all,hex:string)=>{const char=String.fromCharCode(parseInt(hex,16));return /[a-z0-9._~-]/i.test(char)?char:all.toUpperCase();});
+ path=normalized(path);
  const groups:{agents:string[];rules:{allow:boolean;path:string}[]}[]=[];let group:typeof groups[number]|undefined,hasRules=false;
  for(const raw of text.split(/\r?\n/)){
   const line=raw.replace(/#.*/,'').trim();if(!line)continue;const i=line.indexOf(':');if(i<0)return false;
   const key=line.slice(0,i).trim().toLowerCase(),value=line.slice(i+1).trim();
   if(key==='user-agent'){if(!group||hasRules){group={agents:[],rules:[]};groups.push(group);hasRules=false;}group.agents.push(value.toLowerCase());}
-  else if(key==='allow'||key==='disallow'){if(!group)return false;hasRules=true;if(value)group.rules.push({allow:key==='allow',path:value});}
+  else if(key==='allow'||key==='disallow'){if(!group)return false;hasRules=true;if(value){if(/%(?![a-f0-9]{2})/i.test(value))return false;group.rules.push({allow:key==='allow',path:normalized(value)});}}
   else if(key!=='sitemap')return false;
  }
  const specific=groups.filter(g=>g.agents.some(a=>a!=='*'&&SOURCE_USER_AGENT.toLowerCase().includes(a))),selected=specific.length?specific:groups.filter(g=>g.agents.includes('*'));

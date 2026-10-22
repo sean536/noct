@@ -24,3 +24,13 @@ test('refresh uses robots then official HTML then its linked ICS, no constructed
  const result=await refreshSources([s],TEST_NOW,async url=>{calls.push(String(url));return new Response(calls.length===1?'User-agent: *\nAllow: /':calls.length===2?'<a href="/upcoming/__test-only__?format=ical">ICS</a>':calendar());});
  assert.deepEqual(calls,[s.url.replace('/upcoming','/robots.txt'),s.url,source.url]);assert.equal(result.events.length,1);assert.equal(result.refresh.dailyActive,false);
 });
+test('conflicting timezone notation and calendar-level cancellation never publish',()=>{
+ assert.deepEqual(icalEvents(calendar().replace('DTSTART:20300111T210000Z','DTSTART;TZID=Europe/Berlin:20300710T220000Z').replace('DTEND:20300112T050000Z','DTEND:20300711T050000Z'),source,TEST_NOW),[]);
+ assert.deepEqual(icalEvents(calendar().replace('VERSION:2.0','VERSION:2.0\r\nMETHOD:CANCEL'),source,TEST_NOW),[]);
+});
+
+test('case-insensitive cancellation and private metadata cannot bypass import gates',()=>{
+ assert.deepEqual(icalEvents(calendar().replace('VERSION:2.0','VERSION:2.0\r\nmethod:CANCEL'),source,TEST_NOW),[]);
+ assert.deepEqual(icalEvents(calendar(['CLASS:private']),source,TEST_NOW),[]);
+ assert.deepEqual(icalEvents(calendar(['class:PRIVATE']),source,TEST_NOW),[]);
+});
