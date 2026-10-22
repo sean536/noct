@@ -1,5 +1,8 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
+import {createRoot,type Root} from 'react-dom/client';
+import MapFocusCard,{focusPhotoSizes} from './MapFocusCard';
+import {locationImageFor} from '@/lib/location-images';
 import maplibregl,{type Map as GLMap} from 'maplibre-gl';
 import {Map as MapIcon,RotateCcw} from 'lucide-react';
 import {type NightEvent} from '@/lib/events';
@@ -47,7 +50,7 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
   let warmTarget:TourStop|undefined,lastArrival='',lastTraffic='';
   let traffic:TrafficLayer|undefined,recovery:ReturnType<typeof setTimeout>|undefined,facades:FacadeMap|undefined;let facadeGeneration=0;const touches=new Set<number>();
   const began=performance.now();let firstImagery:number|undefined,firstBuildings:number|undefined,lastReport='',lastFrameP75:number|undefined;
-  let labelEventId:string|undefined,labelName:HTMLElement|undefined,labelPlace:HTMLElement|undefined,labelTime:HTMLElement|undefined,labelTag:HTMLElement|undefined;
+  let labelEventId:string|undefined,labelRoot:Root|undefined;const focusImages=new Map<string,HTMLImageElement>();
   const byId={get:(id:string)=>targets.current.get(id)};
   const focused=(request:FocusRequest)=>byId.get(request.locationId?`location:${request.locationId}`:request.eventId||'');
   const openTarget=(target:MapTarget)=>{if(target.event)callbacks.current.onSelect(target.event);else callbacks.current.onLocationSelect(target.location);};
@@ -74,21 +77,22 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
    map.current=instance;
    if(imagery.maptiler)instance.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
    highlight.current=(event)=>{
-    if(!event){label?.remove();label=undefined;labelEventId=undefined;return;}
+    if(!event){const root=labelRoot;labelRoot=undefined;label?.remove();label=undefined;labelEventId=undefined;if(root)queueMicrotask(()=>root.unmount());return;}
     if(!instance)return;
     labelEventId=event.id;pins.current.forEach(p=>p.el.classList.toggle('pin-active',p.id===`location:${event.location.id}`));
     if(!label){
-     const el=document.createElement('button');el.className='event-map-label';const tag=document.createElement('small');labelTag=tag;
-     labelName=document.createElement('strong');labelPlace=document.createElement('span');labelTime=document.createElement('span');labelTime.className='label-time';
-     el.append(tag,labelName,labelPlace,labelTime);el.onclick=()=>{const selected=labelEventId&&byId.get(labelEventId);if(selected){controller?.pause('manual');openTarget(selected)}};
+     const el=document.createElement('div');el.className='event-map-anchor';labelRoot=createRoot(el);
      label=new maplibregl.Marker({element:el,anchor:'bottom',offset:[0,-50]}).setLngLat(event.coords).addTo(instance);
     }
-    labelName!.textContent=event.name;labelPlace!.textContent=event.venue;labelTime!.textContent=event.event?`${event.event.date} · ${event.time} Uhr`:event.location.address;labelTag!.textContent=event.event?'VERANSTALTUNG':'LOCATION';
-    label.getElement().setAttribute('aria-label',`${event.event?'Veranstaltung':'Location'} ${event.name}. Details ansehen`);
+    labelRoot!.render(<MapFocusCard location={event.location} event={event.event} onOpen={()=>{const selected=labelEventId&&byId.get(labelEventId);if(selected){controller?.pause('manual');openTarget(selected)}}}/>);
     label.setLngLat(event.coords);
    };
    const warmStop=(stop:TourStop|undefined)=>{
     warmTarget=stop;
+    // Warm only the current/next permitted venue image using normal browser cache.
+    // Geometry, animation ownership and readiness remain independent of photo loading.
+    const target=stop&&byId.get(stop.id),photo=target&&locationImageFor(target.location.name);
+    if(photo&&!focusImages.has(photo.id)){const image=new Image();image.decoding='async';image.sizes=focusPhotoSizes(photo);image.srcset=photo.srcSet;image.src=photo.src;focusImages.set(photo.id,image);}
     if(!profile.prefetch||!stop||!instance||document.hidden)return;
     const vector=instance.getSource('buildings') as maplibregl.VectorTileSource|undefined;
     const raster=instance.getSource('imagery') as maplibregl.RasterTileSource|undefined;
@@ -105,8 +109,8 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
      if(!instance)return;
      const scene=instance;
      warmStop(stop);
-     // Hide the new destination label until the target has been drawn (or the bounded fallback).
-     if(label)label.getElement().style.visibility='hidden';
+     // The venue photo is already available during approach, without changing the camera.
+     if(label)label.getElement().style.visibility='';
      const here=scene.getCenter(),bearing=arrivalBearing([here.lng,here.lat],stop.coords),region=targetRegion(stop.coords);
      const duration=media.matches?0:intro?3200:Math.min(4600,Math.max(2600,Math.round(2300+distanceKm([here.lng,here.lat],stop.coords)*350)));
      let end:(()=>void)|undefined,descended=false;
@@ -216,7 +220,7 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
     if(action==='zoom-in')instance?.zoomIn({duration});if(action==='zoom-out')instance?.zoomOut({duration});
    };
   }catch{if(!disposed)setStatus('webgl')}
-  return()=>{disposed=true;facadeGeneration++;facades?.destroy();clearTimeout(timeout);if(recovery)clearTimeout(recovery);recoverHandler.current=()=>{};trafficRef.current=null;controller?.destroy();prefetch.destroy();tour.current=null;commandHandler.current=null;label?.remove();container.removeEventListener('pointerdown',pointerStart);container.removeEventListener('wheel',manual);container.removeEventListener('keydown',manual);window.removeEventListener('pointerup',pointerEnd);window.removeEventListener('pointercancel',pointerEnd);document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',motion);pins.current=[];updateMarkers.current=()=>{};highlight.current=()=>{};instance?.remove();map.current=null};
+  return()=>{disposed=true;facadeGeneration++;facades?.destroy();clearTimeout(timeout);if(recovery)clearTimeout(recovery);recoverHandler.current=()=>{};trafficRef.current=null;controller?.destroy();prefetch.destroy();tour.current=null;commandHandler.current=null;const root=labelRoot;labelRoot=undefined;if(root)queueMicrotask(()=>root.unmount());label?.remove();focusImages.forEach(image=>{image.removeAttribute('srcset');image.removeAttribute('src')});focusImages.clear();container.removeEventListener('pointerdown',pointerStart);container.removeEventListener('wheel',manual);container.removeEventListener('keydown',manual);window.removeEventListener('pointerup',pointerEnd);window.removeEventListener('pointercancel',pointerEnd);document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',motion);pins.current=[];updateMarkers.current=()=>{};highlight.current=()=>{};instance?.remove();map.current=null};
  },[retry]);
  useEffect(()=>{if(command)commandHandler.current?.(command.action)},[command]);
  useEffect(()=>{

@@ -168,3 +168,18 @@ button,a,input{touch-action:manipulation}button svg{flex-shrink:0}a{color:inheri
 .photo-card .heart:active{transform:scale(.94)}.photo-card .heart[aria-pressed=true]{color:#fff}
 .photo-card .card-open:focus-visible{outline:3px solid #fff;outline-offset:-6px}.photo-card .heart:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 6px #1c1c1e}
 @media(max-width:360px){.photo-card .card-body{padding-right:16px;padding-left:16px;padding-bottom:16px}.photo-card .photo-venue{font-size:22px}}
+
+/* Existing map focus only: four owner-private venue photos, two named neutral fallbacks. */
+.event-map-anchor{width:220px;max-width:calc(100vw - 40px)}
+.event-map-anchor .event-map-label{position:relative;width:100%;min-width:0;max-width:none;cursor:pointer}
+.event-map-label .focus-content{display:flex;flex-direction:column;gap:4px;position:relative;z-index:2;text-align:left}
+.event-map-label .focus-place{font-size:11px;line-height:1.4;color:#636366}
+.event-map-label.neutral-focus{background:linear-gradient(145deg,#fff,#f5f5f7);color:#1c1c1e}
+.event-map-label.photo-focus{min-height:168px;padding:0;overflow:hidden;display:flex;justify-content:flex-end;background:#1c1c1e;color:#fff;isolation:isolate}
+.event-map-label.photo-focus:after{display:none}
+.photo-focus .focus-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.photo-focus .focus-shade{position:absolute;inset:0;background:linear-gradient(180deg,#00000008 0%,#00000020 25%,#000000b8 70%,#000000dc 100%);z-index:1}
+.event-map-label.photo-focus .focus-content{padding:34px 14px 13px;color:#fff;gap:3px}
+.event-map-label.photo-focus small,.event-map-label.photo-focus .focus-place,.event-map-label.photo-focus .label-time{color:#ffffffed}
+.event-map-label strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.event-map-label.photo-focus:focus-visible{outline:3px solid white;outline-offset:3px}
