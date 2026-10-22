@@ -75,7 +75,7 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
    if(imagery.maptiler)instance.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
    highlight.current=(event)=>{
     if(!event){label?.remove();label=undefined;labelEventId=undefined;return;}
-    if(!instance||labelEventId===event.id)return;
+    if(!instance)return;
     labelEventId=event.id;pins.current.forEach(p=>p.el.classList.toggle('pin-active',p.id===`location:${event.location.id}`));
     if(!label){
      const el=document.createElement('button');el.className='event-map-label';const tag=document.createElement('small');labelTag=tag;
@@ -177,7 +177,7 @@ export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,t
      pin.el.classList.toggle('pin-muted',state.activeIds!==null&&!event&&!state.activeIds.includes(pin.id));
      pin.el.querySelector('.pin-symbol')!.textContent=event?.genre==='Techno'?'↯':location.categories.includes('Rooftop')?'☼':'•';
     }
-    if(labelEventId&&!byId.get(labelEventId))highlight.current(null);
+    if(labelEventId)highlight.current(byId.get(labelEventId)||null);
    };updateMarkers.current();
    container.addEventListener('pointerdown',pointerStart,{passive:true});container.addEventListener('wheel',manual,{passive:true});container.addEventListener('keydown',manual);window.addEventListener('pointerup',pointerEnd,{passive:true});window.addEventListener('pointercancel',pointerEnd,{passive:true});
    document.addEventListener('visibilitychange',visibility);media.addEventListener('change',motion);

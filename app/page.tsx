@@ -31,7 +31,7 @@ export default function Home(){
  const commandId=useRef(0),timer=useRef<ReturnType<typeof setTimeout>|null>(null),requestBusy=useRef(false),history=useRef<HTMLDivElement>(null),latestPreferences=useRef(preferences);
  latestPreferences.current=preferences;
  const modalOpen=!!selected||!!selectedLocation||about||panel==='filter';
- const filtered=useMemo(()=>events.filter(event=>matchesFilters(event,preferences)),[preferences]);
+ const filtered=useMemo(()=>events.filter(event=>matchesFilters(event,preferences)),[events,preferences]);
  const lastResponse=messages.findLast(message=>message.role==='assistant');
  const recommendedIds=lastResponse?.eventIds;
  const activeIds=useMemo(()=>{
@@ -59,7 +59,7 @@ export default function Home(){
   setHydrated(true);return()=>{if(timer.current)clearTimeout(timer.current);};
  },[]);
  useEffect(()=>{if(hydrated)try{localStorage.setItem('noct-saved',JSON.stringify(saved));}catch{setNotice('Speichern ist nur für diese Sitzung möglich.');}},[saved,hydrated]);
- useEffect(()=>{if(eventStatus==='loading')return;setSaved(current=>{const next=current.filter(id=>locations.some(location=>`location:${location.id}`===id)||events.some(event=>event.id===id));return next.length===current.length?current:next;});setSelected(current=>current&&events.some(event=>event.id===current.id)?current:null);},[eventStatus,events]);
+ useEffect(()=>{if(eventStatus==='loading')return;setSaved(current=>{const next=current.filter(id=>locations.some(location=>`location:${location.id}`===id)||events.some(event=>event.id===id));return next.length===current.length?current:next;});setSelected(current=>current?events.find(event=>event.id===current.id)||null:null);},[eventStatus,events]);
  useEffect(()=>{if(!notice)return;const id=setTimeout(()=>setNotice(''),2400);return()=>clearTimeout(id);},[notice]);
  useEffect(()=>{history.current?.scrollTo({top:history.current.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},[messages,busy,panel,preferences]);
  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape')setCityMenu(false);};document.addEventListener('keydown',key);return()=>document.removeEventListener('keydown',key);},[]);
@@ -116,7 +116,7 @@ export default function Home(){
     <div className="scroll" ref={history} role="log" aria-live="polite" aria-label="Chatverlauf">
      {!messages.length&&<><div className="msg ai">{events.length?'Nenne Musikrichtung, Bezirk oder Budget. Ich suche in verifizierten Veranstaltungen.':NO_EVENTS}</div><button className="browse-events" onClick={explore}>Locations und Events entdecken</button></>}
      {messages.map((message,index)=>{const matches=message.eventIds?events.filter(event=>message.eventIds!.includes(event.id)&&matchesFilters(event,preferences)):[];const text=message.role==='assistant'&&message.eventIds&&!matches.length?NO_EVENTS:message.text;return <div className="message-group" key={index}><div className={`msg ${message.role==='user'?'me':'ai'}`}>{text}</div>{message.eventIds&&<div className="recommendations" aria-label="Verifizierte Empfehlungen">{matches.map(renderCard)}</div>}{message.locationIds&&<section aria-label="Reale Locations"><p className="msg ai">Locations · unabhängig vom Eventprogramm</p>{locations.filter(location=>message.locationIds!.includes(location.id)).map(renderLocation)}</section>}</div>;})}
-     {busy&&<div className="msg ai typing" role="status" aria-label="NOCT sucht Demo-Empfehlungen"><i/><i/><i/></div>}
+     {busy&&<div className="msg ai typing" role="status" aria-label="NOCT sucht verifizierte Empfehlungen"><i/><i/><i/></div>}
     </div>
    </NoctSheet></div>}
    {panel==='saved'&&<div inert={modalOpen||undefined} className="panel-host"><NoctSheet id="saved" title="Gemerkt" onClose={closePanel}><div className="scroll">{filtered.filter(event=>saved.includes(event.id)).map(renderCard)}{locations.filter(location=>saved.includes(`location:${location.id}`)).map(renderLocation)}{!filtered.some(event=>saved.includes(event.id))&&!locations.some(location=>saved.includes(`location:${location.id}`))&&<div className="empty">{saved.length?'Keine gemerkten Einträge passen zum aktuellen Filter.':'Noch nichts gemerkt.'}<br/><button onClick={explore}>Locations und Events entdecken</button></div>}</div></NoctSheet></div>}

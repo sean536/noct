@@ -10,7 +10,9 @@
     "prebuild": "node scripts/build-facade-worker.mjs",
     "predev": "node scripts/build-facade-worker.mjs",
     "pretest": "node scripts/build-facade-worker.mjs",
-    "pretypecheck": "node scripts/build-facade-worker.mjs"
+    "pretypecheck": "node scripts/build-facade-worker.mjs",
+    "events:refresh": "node --import tsx scripts/refresh-events.ts refresh",
+    "events:validate": "node --import tsx scripts/refresh-events.ts validate"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
