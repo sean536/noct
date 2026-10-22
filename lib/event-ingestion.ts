@@ -2,7 +2,7 @@
 import {eventID} from './event-id';
 export {eventID} from './event-id';
 import {icalEvents,weekendCalendarLinks} from './event-ical';
-import {locationById} from './locations';
+import {locations,locationById} from './locations';
 import {officialURL,readEventSnapshot,type NightEvent,type Genre} from './events';
 import {type EventSource,SOURCE_USER_AGENT} from './event-sources';
 type Obj=Record<string,unknown>;
@@ -65,7 +65,7 @@ async function boundedGet(url:string,fetcher:typeof fetch):Promise<string>{
 export async function refreshSources(sources:EventSource[],now=Date.now(),fetcher:typeof fetch=fetch){
  const events:NightEvent[]=[],report:{locationId:string;status:string;count:number}[]=[];
  // Sequential and bounded. No persistent cache or bulk scraping; no stale fallback on failure.
- for(const source of sources.slice(0,4)){
+ for(const source of sources.slice(0,locations.length)){
   if(!source.enabled||!source.rightsReviewed){report.push({locationId:source.locationId,status:'disabled-pending-permission',count:0});continue;}
   if(!officialURL(source.url,source.locationId)){report.push({locationId:source.locationId,status:'invalid-source',count:0});continue;}
   try{const url=new URL(source.url),robots=await boundedGet(url.origin+'/robots.txt',fetcher);if(!robotsAllowed(robots,url.pathname+url.search))throw Error('Robots policy does not permit this request');

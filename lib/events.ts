@@ -14,7 +14,7 @@ export const priceLabel=(price:number|null)=>price===null?'Eintritt nicht bestä
 export const dateLabel=(date:string)=>new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'Europe/Berlin'}).format(new Date(date+'T12:00:00Z'));
 export const berlinDate=(instant:number|string)=>new Intl.DateTimeFormat('sv-SE',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Europe/Berlin'}).format(new Date(instant));
 export const berlinTime=(instant:string)=>new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Europe/Berlin'}).format(new Date(instant));
-export const isCurrentEvent=(event:NightEvent,now=Date.now())=>Date.parse(event.startsAt)>now&&Date.parse(event.lastVerifiedAt)<=now+60_000&&Date.parse(event.lastVerifiedAt)>now-MAX_VERIFICATION_AGE_MS;
+export const isCurrentEvent=(event:NightEvent,now=Date.now())=>!!locationById(event.locationId)&&Date.parse(event.startsAt)>now&&Date.parse(event.lastVerifiedAt)<=now+60_000&&Date.parse(event.lastVerifiedAt)>now-MAX_VERIFICATION_AGE_MS;
 function iso(value:unknown):value is string{
  if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,3})?)?(?:Z|[+-]\d\d:\d\d)$/.test(value)||!Number.isFinite(Date.parse(value)))return false;
  const [y,m,d]=value.slice(0,10).split('-').map(Number),check=new Date(Date.UTC(y,m-1,d));

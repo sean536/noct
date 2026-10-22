@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import maplibregl,{type Map as GLMap} from 'maplibre-gl';
 import {Map as MapIcon,RotateCcw} from 'lucide-react';
 import {type NightEvent} from '@/lib/events';
-import {locations,locationById,type VenueLocation} from '@/lib/locations';
+import {locations,locationTour,locationById,type VenueLocation} from '@/lib/locations';
 import {BERLIN_CENTER,BERLIN_BOUNDS,imageryConfig,isLoadedImageryEvent} from '@/lib/imagery';
 import {BUILDING_SOURCE,BUILDING_LAYER,CITY_LIGHT} from '@/lib/buildings';
 import {renderProfile,FrameBudget,distanceKm,cameraEase} from '@/lib/rendering';
@@ -23,7 +23,7 @@ const locationTarget=(location:VenueLocation):MapTarget=>({id:`location:${locati
 const eventTarget=(event:NightEvent):MapTarget=>({id:event.id,name:event.name,venue:event.venue,coords:event.coords,time:event.time,event,location:locationById(event.locationId)!});
 interface Props {eventData:NightEvent[];onLocationSelect:(location:VenueLocation)=>void;onSelect:(e:NightEvent)=>void;activeIds:string[]|null;typing:boolean;blocked:boolean;panelOpen:boolean;searching:boolean;focusRequest:FocusRequest|null;command:MapCommand|null;onDiagnostics:(text:string)=>void}
 type MapStatus='loading'|'online'|'error'|'webgl';
-const tourLocations=['weekend-club','bricks-club','amano-rooftop','808-nachtklub'].map(id=>locationTarget(locationById(id)!));
+const tourLocations=locationTour.map(locationTarget);
 export default function CityMap({eventData,onLocationSelect,onSelect,activeIds,typing,blocked,panelOpen,searching,focusRequest,command,onDiagnostics}:Props){
  const host=useRef<HTMLDivElement>(null),map=useRef<GLMap|null>(null),tour=useRef<EventTour|null>(null);
  const callbacks=useRef({onSelect,onLocationSelect,onDiagnostics}),inputs=useRef({typing,blocked,panelOpen,searching,activeIds,focusRequest,eventData});

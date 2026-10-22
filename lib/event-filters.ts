@@ -9,7 +9,7 @@ export const primaryGenres:ReadonlyArray<{label:string;value:DiscoveryGenre}>=[
 ];
 /** One predicate for chat, filter controls, cards and map IDs; original event records stay intact. */
 export function matchesFilters(event:NightEvent,filters:EventFilters){
- return (!filters.genre||event.genre===filters.genre||event.tags.includes(filters.genre)||locationById(event.locationId)?.categories.includes(filters.genre))
+ return !!locationById(event.locationId)&&(!filters.genre||event.genre===filters.genre||event.tags.includes(filters.genre)||locationById(event.locationId)?.categories.includes(filters.genre))
   &&(!filters.district||event.district===filters.district)
   &&(filters.budget===undefined||event.price!==null&&event.price<=filters.budget)
   &&(!filters.fromDate||event.date>=filters.fromDate)&&(!filters.toDate||event.date<=filters.toDate);
