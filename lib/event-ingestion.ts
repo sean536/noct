@@ -1,9 +1,10 @@
 /** Server/CLI-only: bounded, explicit structured facts; never infer dates, prices or genre from prose. */
-import {createHash} from 'node:crypto';
+import {eventID} from './event-id';
+export {eventID} from './event-id';
+import {icalEvents,weekendCalendarLinks} from './event-ical';
 import {locationById} from './locations';
 import {officialURL,readEventSnapshot,type NightEvent,type Genre} from './events';
 import {type EventSource,SOURCE_USER_AGENT} from './event-sources';
-export function eventID(locationId:string,name:string,startsAt:string){return `event:${locationId}:${createHash('sha256').update(`${name.trim().normalize('NFKC').toLocaleLowerCase('de-DE').replace(/\s+/g,' ')}|${Date.parse(startsAt)}`).digest('hex').slice(0,24)}`;}
 type Obj=Record<string,unknown>;
 function objects(value:unknown,depth=0):Obj[]{
  if(depth>8||!value||typeof value!=='object')return [];
@@ -53,7 +54,7 @@ export function robotsAllowed(text:string,path:string):boolean{
  return matches.length===0||matches[0].allow;
 }
 async function boundedGet(url:string,fetcher:typeof fetch):Promise<string>{
- const response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(10_000),headers:{'User-Agent':SOURCE_USER_AGENT,'Accept':'text/html, text/plain;q=0.9'}});
+ const response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(10_000),headers:{'User-Agent':SOURCE_USER_AGENT,'Accept':'text/html, text/calendar;q=0.9, text/plain;q=0.8'}});
  if(!response.ok)throw Error(`HTTP ${response.status}`);if(Number(response.headers.get('content-length')||0)>2_000_000)throw Error('Response too large');
  if(!response.body)return '';const reader=response.body.getReader(),chunks:Uint8Array[]=[];let size=0;
  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2_000_000)throw Error('Response too large');chunks.push(value);}}finally{await reader.cancel();}
@@ -66,7 +67,11 @@ export async function refreshSources(sources:EventSource[],now=Date.now(),fetche
   if(!source.enabled||!source.rightsReviewed){report.push({locationId:source.locationId,status:'disabled-pending-permission',count:0});continue;}
   if(!officialURL(source.url,source.locationId)){report.push({locationId:source.locationId,status:'invalid-source',count:0});continue;}
   try{const url=new URL(source.url),robots=await boundedGet(url.origin+'/robots.txt',fetcher);if(!robotsAllowed(robots,url.pathname+url.search))throw Error('Robots policy does not permit this request');
-   const data=structuredEvents(await boundedGet(source.url,fetcher),source,now);events.push(...data);report.push({locationId:source.locationId,status:data.length?'verified-structured':'no-verified-structured-events',count:data.length});
+   const html=await boundedGet(source.url,fetcher),data=structuredEvents(html,source,now);
+   if(source.locationId==='weekend-club'){
+    for(const link of weekendCalendarLinks(html,source)){const feed=new URL(link);if(!robotsAllowed(robots,feed.pathname+feed.search))continue;data.push(...icalEvents(await boundedGet(link,fetcher),{...source,url:link},now));}
+   }
+   events.push(...data);report.push({locationId:source.locationId,status:data.length?'verified-structured':'no-verified-structured-events',count:data.length});
   }catch(error){report.push({locationId:source.locationId,status:`unavailable: ${error instanceof Error?error.message:'request failed'}`,count:0});}
  }
  return {version:1,events:readEventSnapshot({version:1,events},now,'owner-private'),refresh:{mode:'prepared-not-active',dailyActive:false,attemptedAt:new Date(now).toISOString(),sources:report}};

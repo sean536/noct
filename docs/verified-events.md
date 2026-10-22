@@ -49,3 +49,9 @@ Vor Aktivierung sind erforderlich:
 4. Privates Publizieren auf genau der bestehenden Entwicklungswebsite, deren Owner-Zugriff vorher prüfen. Kein automatischer Merge, keine Veröffentlichung auf der ursprünglichen Website. Ein öffentlicher kommerzieller Kalender erfordert gesonderte Quellen- und Bildfreigaben.
 
 Es wurden keine kostenpflichtigen APIs, Konten, Secrets oder neuen Berechtigungen eingerichtet.
+
+### Fortsetzung 22.10.2026 – Weekend-Adapter
+
+Der Job kann zusätzlich die **tatsächlich im offiziellen Weekend-Kalender verlinkten ICS-Dateien** lesen (höchstens sechs je Lauf). Er erfindet keine Feed-URL. Jeder Feed muss Robots erlauben, auf der offiziellen Domain liegen und eine Veranstaltung im Weekend Club an der Alexanderstraße 7 beschreiben. UTC und eindeutige `Europe/Berlin`-Zeiten werden unterstützt; fehlende Zeitzonen, ganztägige Daten, Sommerzeit-Lücken/-Mehrdeutigkeiten, Wiederholungsregeln, private und abgesagte Einträge werden verworfen. Keine Preisableitung aus Beschreibungen. Importiert werden ausschließlich bestätigte Kalenderfelder, dedupliziert durch das gemeinsame Schema.
+
+Fünf Parser-/Jobtests prüfen diese Grenzen mit ausdrücklich synthetischen, ausschließlich testinternen ICS-Fixtures. **Kein erfolgreicher automatischer Live-Abruf behauptet:** Der Rechercheconnector kann die angebotenen ICS-Links nicht auslesen; direkte Club-HTTP-Abrufe sind im verwalteten Entwicklungsnetz nicht freigeschaltet. Rechte-/Robots-Prüfung bleibt vor Aktivierung erforderlich.
