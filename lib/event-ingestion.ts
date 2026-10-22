@@ -68,7 +68,7 @@ export async function refreshSources(sources:EventSource[],now=Date.now(),fetche
   if(!officialURL(source.url,source.locationId)){report.push({locationId:source.locationId,status:'invalid-source',count:0});continue;}
   try{const url=new URL(source.url),robots=await boundedGet(url.origin+'/robots.txt',fetcher);if(!robotsAllowed(robots,url.pathname+url.search))throw Error('Robots policy does not permit this request');
    const html=await boundedGet(source.url,fetcher),data=structuredEvents(html,source,now);
-   if(source.locationId==='weekend-club'){
+   if(source.adapter==='weekend-calendar'||!source.adapter&&source.locationId==='weekend-club'){
     for(const link of weekendCalendarLinks(html,source)){const feed=new URL(link);if(!robotsAllowed(robots,feed.pathname+feed.search))continue;data.push(...icalEvents(await boundedGet(link,fetcher),{...source,url:link},now));}
    }
    events.push(...data);report.push({locationId:source.locationId,status:data.length?'verified-structured':'no-verified-structured-events',count:data.length});
